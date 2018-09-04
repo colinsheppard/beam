@@ -72,7 +72,7 @@ class ParkingSpec
         ConfigValueFactory.fromAnyRef(s"test/input/beamville/taz-parking-$parkingScenario.csv")
       )
       .withValue(
-        "beam.agentsim.agents.modalBehaviors.modeChoiceClass",
+        TestConstants.KEY_AGENT_MODAL_BEHAVIORS_MODE_CHOICE_CLASS,
         ConfigValueFactory.fromAnyRef("ModeChoiceMultinomialLogit")
       )
 //      .withValue("beam.agentsim.agents.modalBehaviors.mulitnomialLogit.params.car_intercept", ConfigValueFactory.fromAnyRef(50))
