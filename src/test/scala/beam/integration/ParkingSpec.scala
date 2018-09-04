@@ -73,7 +73,7 @@ class ParkingSpec
       )
       .withValue(
         TestConstants.KEY_AGENT_MODAL_BEHAVIORS_MODE_CHOICE_CLASS,
-        ConfigValueFactory.fromAnyRef("ModeChoiceMultinomialLogit")
+        ConfigValueFactory.fromAnyRef(TestConstants.MODE_CHOICE_MULTINOMIAL_LOGIT)
       )
 //      .withValue("beam.agentsim.agents.modalBehaviors.mulitnomialLogit.params.car_intercept", ConfigValueFactory.fromAnyRef(50))
       .withValue(
