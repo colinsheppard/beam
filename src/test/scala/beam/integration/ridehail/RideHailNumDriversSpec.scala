@@ -5,10 +5,6 @@ import beam.sim.BeamHelper
 import com.typesafe.config.ConfigValueFactory
 import org.scalatest.{Matchers, WordSpecLike}
 
-/**
-  * Created by fdariasm on 29/08/2017
-  *
-  */
 class RideHailNumDriversSpec
     extends WordSpecLike
     with Matchers
@@ -37,15 +33,6 @@ class RideHailNumDriversSpec
         .map(_.get("ride_hail"))
         .filter(_.isDefined)
         .map(_.get)
-
-      //      val z1 = tc.drop(1)
-      //      val z2 = tc.dropRight(1)
-      //      val zip = z2 zip z1
-
-      //      println(tc)
-      //      println(z1)
-      //      println(z2)
-      //      println(zip)
 
       isOrdered(tc)((a, b) => a <= b) shouldBe true
     }

@@ -19,7 +19,7 @@ class RideHailCostPerMileSpec
           baseConfig
             .withValue(
               RideHailTestHelper.KEY_AGENT_MODAL_BEHAVIORS_MODE_CHOICE_CLASS,
-              ConfigValueFactory.fromAnyRef("ModeChoiceMultinomialLogit")
+              ConfigValueFactory.fromAnyRef(RideHailTestHelper.AGENT_MODE_CHOICE_MULTINOMIAL_LOGIC)
             )
             .withValue(
               RideHailTestHelper.KEY_DEFAULT_COST_PER_MILE,
