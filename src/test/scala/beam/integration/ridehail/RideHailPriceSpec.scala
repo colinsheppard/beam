@@ -6,6 +6,7 @@ import com.typesafe.config.ConfigValueFactory
 import org.scalatest.{Matchers, WordSpecLike}
 
 class RideHailPriceSpec extends WordSpecLike with Matchers with BeamHelper with IntegrationSpecCommon {
+
   "Running beam with modeChoice ModeChoiceMultinomialLogit and increasing rideHailPrice value" must {
     "create less entries for mode choice rideHail as value increases" ignore {
       val inputRideHailPrice = Seq(0.1, 1.0)
