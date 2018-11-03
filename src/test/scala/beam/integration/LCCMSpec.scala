@@ -9,9 +9,10 @@ import com.typesafe.config.ConfigValueFactory
 import org.matsim.core.controler.AbstractModule
 import org.matsim.core.controler.listener.IterationEndsListener
 import org.matsim.core.scenario.{MutableScenario, ScenarioUtils}
-import org.scalatest.FlatSpec
+import org.scalatest.{FlatSpec, Ignore}
 import org.scalatest.mockito.MockitoSugar
 
+@Ignore
 class LCCMSpec extends FlatSpec with BeamHelper with MockitoSugar {
 
   it should "be able to run for three iterations with LCCM without exceptions" in {
