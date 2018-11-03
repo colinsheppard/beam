@@ -5,12 +5,12 @@ import java.util.Random
 import beam.agentsim.agents.choice.logit.LatentClassChoiceModel.{Mandatory, TourType}
 import beam.agentsim.agents.choice.logit.{AlternativeAttributes, LatentClassChoiceModel}
 import beam.agentsim.agents.choice.mode.ModeChoiceLCCM.ModeChoiceData
-import beam.agentsim.agents.household.HouseholdActor.AttributesOfIndividual
 import beam.agentsim.agents.modalbehaviors.ModeChoiceCalculator
 import beam.router.Modes.BeamMode
 import beam.router.Modes.BeamMode.{BIKE, CAR, DRIVE_TRANSIT, RIDE_HAIL, TRANSIT, WALK, WALK_TRANSIT}
 import beam.router.model.EmbodiedBeamTrip
 import beam.sim.BeamServices
+import beam.sim.population.AttributesOfIndividual
 
 /**
   * ModeChoiceLCCM
@@ -41,7 +41,10 @@ class ModeChoiceLCCM(
   var expectedMaximumUtility: Double = Double.NaN
   var classMembershipDistribution: Map[String, Double] = Map()
 
-  override def apply(alternatives: IndexedSeq[EmbodiedBeamTrip], attributesOfIndividual: AttributesOfIndividual): Option[EmbodiedBeamTrip] = {
+  override def apply(
+    alternatives: IndexedSeq[EmbodiedBeamTrip],
+    attributesOfIndividual: AttributesOfIndividual
+  ): Option[EmbodiedBeamTrip] = {
     choose(alternatives, attributesOfIndividual, Mandatory)
   }
 
@@ -66,19 +69,19 @@ class ModeChoiceLCCM(
       }
 
       val attribIndivData: AlternativeAttributes = {
-            val theParams: Map[String, Double] = Map(
-              "income"        -> attributesOfIndividual.householdAttributes.householdIncome,
-              "householdSize" -> attributesOfIndividual.householdAttributes.householdSize,
-              "male" -> (if (attributesOfIndividual.isMale) {
-                           1.0
-                         } else {
-                           0.0
-                         }),
-              "numCars"  -> attributesOfIndividual.householdAttributes.numCars,
-              "numBikes" -> attributesOfIndividual.householdAttributes.numBikes
-            )
-            AlternativeAttributes("dummy", theParams)
-        }
+        val theParams: Map[String, Double] = Map(
+          "income"        -> attributesOfIndividual.householdAttributes.householdIncome,
+          "householdSize" -> attributesOfIndividual.householdAttributes.householdSize,
+          "male" -> (if (attributesOfIndividual.isMale) {
+                       1.0
+                     } else {
+                       0.0
+                     }),
+          "numCars"  -> attributesOfIndividual.householdAttributes.numCars,
+          "numBikes" -> attributesOfIndividual.householdAttributes.numBikes
+        )
+        AlternativeAttributes("dummy", theParams)
+      }
 
       val classMembershipInputData =
         lccm.classMembershipModels.head._2.alternativeParams.keySet.map { theClassName =>
