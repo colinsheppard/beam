@@ -16,10 +16,8 @@ import beam.router.BeamRouter._
 import beam.router.Modes.BeamMode.CAR
 import beam.router.gtfs.FareCalculator
 import beam.router.gtfs.FareCalculator.BeamFareSegment
-import beam.router.model.RoutingModel
 import beam.router.osm.TollCalculator
 import beam.router.r5.DefaultNetworkCoordinator
-import beam.sim.BeamServices.readFuelTypeFile
 import beam.sim.common.GeoUtilsImpl
 import beam.sim.config.{BeamConfig, MatSimBeamConfigBuilder}
 import beam.sim.population.DefaultPopulationAdjustment
@@ -183,7 +181,8 @@ class WarmStartRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       var response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == CAR))
@@ -205,7 +204,8 @@ class WarmStartRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       response = expectMsgType[RoutingResponse]
 
@@ -239,7 +239,8 @@ class WarmStartRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       var response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == CAR))
@@ -260,7 +261,8 @@ class WarmStartRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == CAR))
@@ -291,7 +293,8 @@ class WarmStartRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       var response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == CAR))
@@ -311,7 +314,8 @@ class WarmStartRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == CAR))
@@ -337,7 +341,8 @@ class WarmStartRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
 
       var response = expectMsgType[RoutingResponse]
@@ -369,7 +374,8 @@ class WarmStartRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       response = expectMsgType[RoutingResponse]
 

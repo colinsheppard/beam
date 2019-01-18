@@ -131,6 +131,7 @@ trait ChoosesParking extends {
           currentPoint.time,
           Vector(),
           Vector(carStreetVeh, bodyStreetVeh),
+          beamServices.idGen.nextId,
           Some(attributes)
         )
         val futureVehicle2StallResponse = router ? veh2StallRequest
@@ -150,6 +151,7 @@ trait ChoosesParking extends {
               asDriver = true
             )
           ),
+          beamServices.idGen.nextId,
           Some(attributes)
         )
 

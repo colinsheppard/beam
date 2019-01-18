@@ -256,7 +256,8 @@ class RideHailManager(
 
   private val rideHailResourceAllocationManager = RideHailResourceAllocationManager(
     beamServices.beamConfig.beam.agentsim.agents.rideHail.allocationManager.name,
-    this
+    this,
+    beamServices.idGen
   )
 
   val modifyPassengerScheduleManager =
@@ -760,7 +761,8 @@ class RideHailManager(
         destinationUTM = stall.locationUTM,
         departureTime = agentLocation.currentLocationUTM.time,
         transitModes = Vector(),
-        streetVehicles = Vector(agentLocation.toStreetVehicle)
+        streetVehicles = Vector(agentLocation.toStreetVehicle),
+        beamServices.idGen.nextId,
       )
       val futureRideHail2ParkingRouteRequest = router ? routingRequest
 
@@ -900,7 +902,8 @@ class RideHailManager(
       request.pickUpLocationUTM,
       requestTime,
       Vector(),
-      Vector(rideHailVehicleAtOrigin)
+      Vector(rideHailVehicleAtOrigin),
+      beamServices.idGen.nextId,
     )
 // route from customer to destination
     val rideHail2Destination = RoutingRequest(
@@ -908,7 +911,8 @@ class RideHailManager(
       request.destinationUTM,
       requestTime,
       Vector(),
-      Vector(rideHailVehicleAtPickup)
+      Vector(rideHailVehicleAtPickup),
+      beamServices.idGen.nextId,
     )
 
     List(rideHailAgent2Customer, rideHail2Destination)
@@ -1140,7 +1144,8 @@ class RideHailManager(
           destinationUTM = destinationLocation,
           departureTime = tick,
           transitModes = Vector(),
-          streetVehicles = Vector(rideHailVehicleAtOrigin)
+          streetVehicles = Vector(rideHailVehicleAtOrigin),
+          beamServices.idGen.nextId,
         )
         val futureRideHailAgent2CustomerResponse = router ? routingRequest
 

@@ -7,7 +7,7 @@ import java.util.concurrent.ThreadLocalRandom
 import akka.actor.Status.Success
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import beam.agentsim.agents.vehicles.{BeamVehicle, BeamVehicleType}
+import beam.agentsim.agents.vehicles.BeamVehicleType
 import beam.agentsim.agents.vehicles.VehicleProtocol.StreetVehicle
 import beam.agentsim.events.SpaceTime
 import beam.agentsim.infrastructure.ZonalParkingManagerSpec
@@ -51,7 +51,6 @@ import org.scalatest._
 import org.scalatest.mockito.MockitoSugar
 
 import scala.collection.JavaConverters._
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -168,7 +167,8 @@ class RouterPerformanceSpec
                 CAR,
                 asDriver = true
               )
-            )
+            ),
+            1
           )
           val response = expectMsgType[RoutingResponse]
 
@@ -232,7 +232,7 @@ class RouterPerformanceSpec
               case None =>
             }
             val response = within(60 second) {
-              router ! RoutingRequest(origin, destination, time, transitModes, streetVehicles)
+              router ! RoutingRequest(origin, destination, time, transitModes, streetVehicles, 1)
               expectMsgType[RoutingResponse]
             }
           })

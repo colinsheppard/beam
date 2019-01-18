@@ -13,14 +13,12 @@ import beam.agentsim.events.SpaceTime
 import beam.router.BeamRouter._
 import beam.router.Modes.BeamMode
 import beam.router.Modes.BeamMode.CAR
-import beam.router.model.{BeamLeg, BeamPath}
 import beam.router.gtfs.FareCalculator
 import beam.router.gtfs.FareCalculator.BeamFareSegment
-import beam.router.model.RoutingModel
+import beam.router.model.{BeamLeg, BeamPath, RoutingModel}
 import beam.router.osm.TollCalculator
 import beam.router.r5.DefaultNetworkCoordinator
 import beam.sim.BeamServices
-import beam.sim.BeamServices.readFuelTypeFile
 import beam.sim.common.GeoUtilsImpl
 import beam.sim.config.BeamConfig
 import beam.utils.DateUtils
@@ -140,7 +138,8 @@ class TimeDependentRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == CAR))
@@ -161,7 +160,8 @@ class TimeDependentRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response2 = expectMsgType[RoutingResponse]
       assert(response2.itineraries.exists(_.tripClassifier == CAR))
@@ -182,7 +182,8 @@ class TimeDependentRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response3 = expectMsgType[RoutingResponse]
       assert(response3.itineraries.exists(_.tripClassifier == CAR))
@@ -212,7 +213,8 @@ class TimeDependentRoutingSpec
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       var carOption = expectMsgType[RoutingResponse].itineraries.find(_.tripClassifier == CAR).get
 
@@ -247,7 +249,8 @@ class TimeDependentRoutingSpec
               Modes.BeamMode.CAR,
               asDriver = true
             )
-          )
+          ),
+          1
         )
         carOption = expectMsgType[RoutingResponse].itineraries.find(_.tripClassifier == CAR).getOrElse(carOption)
       }

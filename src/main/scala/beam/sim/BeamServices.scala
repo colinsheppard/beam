@@ -20,7 +20,7 @@ import beam.sim.BeamServices.{getTazTreeMap, readBeamVehicleTypeFile, readFuelTy
 import beam.sim.common.GeoUtils
 import beam.sim.config.BeamConfig
 import beam.sim.metrics.Metrics
-import beam.utils.{DateUtils, FileUtils}
+import beam.utils.{DateUtils, FileUtils, IdGenerator, IdGeneratorImpl}
 import com.google.inject.{ImplementedBy, Inject, Injector}
 import org.matsim.api.core.v01.population.Person
 import org.matsim.api.core.v01.{Coord, Id}
@@ -64,6 +64,8 @@ trait BeamServices {
   var iterationNumber: Int = -1
 
   def startNewIteration()
+
+  def idGen: IdGenerator
 }
 
 class BeamServicesImpl @Inject()(val injector: Injector) extends BeamServices {
@@ -157,6 +159,8 @@ class BeamServicesImpl @Inject()(val injector: Injector) extends BeamServices {
       case None => vehicleTypes
     }
   }
+
+  def idGen: IdGenerator = IdGeneratorImpl
 }
 
 object BeamServices {

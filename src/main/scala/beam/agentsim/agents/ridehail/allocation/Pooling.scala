@@ -1,18 +1,20 @@
 package beam.agentsim.agents.ridehail.allocation
 
-import beam.agentsim.agents.ridehail.RideHailManager.{PoolingInfo}
+import beam.agentsim.agents.ridehail.RideHailManager.PoolingInfo
 import beam.agentsim.agents.ridehail.RideHailVehicleManager.RideHailAgentLocation
 import beam.agentsim.agents.ridehail.{RideHailManager, RideHailRequest}
 import beam.agentsim.agents.vehicles.VehicleProtocol.StreetVehicle
 import beam.agentsim.events.SpaceTime
 import beam.router.BeamRouter.{RoutingRequest, RoutingResponse}
 import beam.router.Modes.BeamMode.CAR
+import beam.utils.IdGenerator
 import org.matsim.api.core.v01.Id
 import org.matsim.vehicles.Vehicle
 
 import scala.collection.mutable
 
-class Pooling(val rideHailManager: RideHailManager) extends RideHailResourceAllocationManager(rideHailManager) {
+class Pooling(val rideHailManager: RideHailManager, idGenerator: IdGenerator)
+    extends RideHailResourceAllocationManager(rideHailManager) {
 
   val tempPickDropStore: mutable.Map[Int, PickDropIdAndLeg] = mutable.Map()
 
@@ -154,7 +156,8 @@ class Pooling(val rideHailManager: RideHailManager) extends RideHailResourceAllo
         req.pickUpLocationUTM,
         startTime,
         Vector(),
-        Vector(rideHailVehicleAtOrigin)
+        Vector(rideHailVehicleAtOrigin),
+        idGenerator.nextId,
       )
       routeReqs = routeReqs :+ routeReq2Pickup
       tempPickDropStore.put(routeReq2Pickup.requestId, PickDropIdAndLeg(req.customer, None))
@@ -175,7 +178,8 @@ class Pooling(val rideHailManager: RideHailManager) extends RideHailResourceAllo
         req.destinationUTM,
         startTime,
         Vector(),
-        Vector(rideHailVehicleAtOrigin)
+        Vector(rideHailVehicleAtOrigin),
+        idGenerator.nextId,
       )
       routeReqs = routeReqs :+ routeReq2Dropoff
       tempPickDropStore.put(routeReq2Dropoff.requestId, PickDropIdAndLeg(req.customer, None))

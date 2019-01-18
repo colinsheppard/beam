@@ -11,7 +11,7 @@ import beam.agentsim.infrastructure.ZonalParkingManagerSpec
 import beam.router.BeamRouter._
 import beam.router.Modes.BeamMode._
 import beam.router.gtfs.FareCalculator
-import beam.router.model.{EmbodiedBeamTrip, RoutingModel}
+import beam.router.model.EmbodiedBeamTrip
 import beam.sim.config.BeamConfig
 import com.typesafe.scalalogging.LazyLogging
 import org.matsim.api.core.v01.population.Person
@@ -54,7 +54,8 @@ class SfLightRouterTransitSpec extends AbstractSfLightSpec with Inside with Lazy
             WALK,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
 
@@ -97,7 +98,8 @@ class SfLightRouterTransitSpec extends AbstractSfLightSpec with Inside with Lazy
                     WALK,
                     asDriver = true
                   )
-                )
+                ),
+                1
               )
               val response = expectMsgType[RoutingResponse]
 
@@ -131,7 +133,8 @@ class SfLightRouterTransitSpec extends AbstractSfLightSpec with Inside with Lazy
             WALK,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
 
@@ -157,7 +160,8 @@ class SfLightRouterTransitSpec extends AbstractSfLightSpec with Inside with Lazy
             WALK,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
 

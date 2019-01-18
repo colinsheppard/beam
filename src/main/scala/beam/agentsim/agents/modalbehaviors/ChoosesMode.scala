@@ -1,6 +1,6 @@
 package beam.agentsim.agents.modalbehaviors
 
-import akka.actor.{ActorRef, FSM}
+import akka.actor.FSM
 import akka.pattern._
 import beam.agentsim.agents.BeamAgent._
 import beam.agentsim.agents.PersonAgent.{ChoosingMode, _}
@@ -173,6 +173,7 @@ trait ChoosesMode {
           departTime,
           Modes.filterForTransit(transitModes),
           vehicles,
+          requestId = beamServices.idGen.nextId,
           Some(attributes),
           streetVehiclesIntermodalUse,
           mustParkAtEnd = true
@@ -212,6 +213,7 @@ trait ChoosesMode {
           startWithWaitBuffer,
           Vector(TRANSIT),
           Vector(bodyStreetVehicle, dummyRHVehicle.copy(locationUTM = currentSpaceTime)),
+          beamServices.idGen.nextId,
           streetVehiclesUseIntermodalUse = AccessAndEgress
         )
         router ! theRequest

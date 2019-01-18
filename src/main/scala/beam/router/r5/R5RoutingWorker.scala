@@ -140,6 +140,9 @@ class R5RoutingWorker(workerParams: WorkerParameters) extends Actor with ActorLo
           beam.sim.BeamServices.getTazTreeMap(beamConfig.beam.agentsim.taz.file)
 
         override def matsimServices: org.matsim.core.controler.MatsimServices = ???
+
+        override def idGen: IdGenerator = ???
+
       }
 
       val defaultTravelTimeByLink = (time: Int, linkId: Int, mode: StreetMode) => {

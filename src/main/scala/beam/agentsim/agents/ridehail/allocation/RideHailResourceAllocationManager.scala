@@ -1,18 +1,17 @@
 package beam.agentsim.agents.ridehail.allocation
 
 import beam.agentsim.agents.modalbehaviors.DrivesVehicle.StopDrivingIfNoPassengerOnBoardReply
-import beam.agentsim.agents.ridehail.RideHailManager.{BufferedRideHailRequestsTrigger, PoolingInfo}
+import beam.agentsim.agents.ridehail.RideHailManager.PoolingInfo
 import beam.agentsim.agents.ridehail.RideHailVehicleManager.RideHailAgentLocation
 import beam.agentsim.agents.ridehail.{RideHailManager, RideHailRequest}
 import beam.agentsim.agents.vehicles.VehiclePersonId
 import beam.router.BeamRouter.{Location, RoutingRequest, RoutingResponse}
 import beam.router.model.EmbodiedBeamLeg
+import beam.utils.IdGenerator
 import com.typesafe.scalalogging.LazyLogging
 import org.matsim.api.core.v01.Id
 import org.matsim.api.core.v01.population.Person
 import org.matsim.vehicles.Vehicle
-
-import scala.collection.mutable
 
 abstract class RideHailResourceAllocationManager(private val rideHailManager: RideHailManager) extends LazyLogging {
 
@@ -194,7 +193,8 @@ object RideHailResourceAllocationManager {
 
   def apply(
     allocationManager: String,
-    rideHailManager: RideHailManager
+    rideHailManager: RideHailManager,
+    idGenerator: IdGenerator
   ): RideHailResourceAllocationManager = {
     allocationManager match {
       case RideHailResourceAllocationManager.DEFAULT_MANAGER =>
@@ -203,7 +203,7 @@ object RideHailResourceAllocationManager {
 //        new EVFleetAllocationManager(rideHailManager)
         new DefaultRideHailResourceAllocationManager(rideHailManager)
       case RideHailResourceAllocationManager.POOLING =>
-        new Pooling(rideHailManager)
+        new Pooling(rideHailManager, idGenerator)
       case RideHailResourceAllocationManager.REPOSITIONING_LOW_WAITING_TIMES =>
         new RepositioningLowWaitingTimes(rideHailManager)
       case RideHailResourceAllocationManager.RANDOM_REPOSITIONING =>

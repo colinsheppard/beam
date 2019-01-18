@@ -32,7 +32,8 @@ class MultiModalRoutingSpec extends AbstractSfLightSpec {
             Modes.BeamMode.WALK,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
       val routedStartTime = response.itineraries.head.beamLegs().head.startTime

@@ -6,7 +6,6 @@ import beam.agentsim.agents.vehicles.VehicleProtocol.StreetVehicle
 import beam.agentsim.events.SpaceTime
 import beam.router.BeamRouter._
 import beam.router.Modes.BeamMode.{CAR, RIDE_HAIL, WALK}
-import beam.router.model.RoutingModel
 import beam.router.model.{BeamLeg, BeamPath, BeamTrip}
 import beam.router.{BeamRouter, Modes}
 import org.matsim.api.core.v01.{Coord, Id}
@@ -34,7 +33,8 @@ class SfLightRouterSpec extends AbstractSfLightSpec with Inside with LoneElement
             Modes.BeamMode.WALK,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == WALK))
@@ -58,7 +58,8 @@ class SfLightRouterSpec extends AbstractSfLightSpec with Inside with LoneElement
             Modes.BeamMode.WALK,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == WALK))
@@ -83,7 +84,8 @@ class SfLightRouterSpec extends AbstractSfLightSpec with Inside with LoneElement
             Modes.BeamMode.WALK,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == WALK))
@@ -121,7 +123,8 @@ class SfLightRouterSpec extends AbstractSfLightSpec with Inside with LoneElement
             Modes.BeamMode.CAR,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == RIDE_HAIL))
@@ -164,7 +167,8 @@ class SfLightRouterSpec extends AbstractSfLightSpec with Inside with LoneElement
             Modes.BeamMode.WALK,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       val response = expectMsgType[RoutingResponse]
       assert(response.itineraries.exists(_.tripClassifier == WALK))
@@ -216,7 +220,8 @@ class SfLightRouterSpec extends AbstractSfLightSpec with Inside with LoneElement
                     Modes.BeamMode.WALK,
                     asDriver = true
                   )
-                )
+                ),
+                1
               )
               val response = expectMsgType[RoutingResponse]
               assert(response.itineraries.exists(_.tripClassifier == WALK))

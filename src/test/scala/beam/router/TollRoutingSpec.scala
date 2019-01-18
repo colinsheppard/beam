@@ -112,8 +112,9 @@ class TollRoutingSpec
             new SpaceTime(new Coord(origin.getX, origin.getY), time),
             Modes.BeamMode.CAR,
             asDriver = true
-          )
+          ),
         ),
+        1,
         attributesOfIndividual = Some(
           AttributesOfIndividual(
             HouseholdAttributes.EMPTY,
@@ -175,6 +176,7 @@ class TollRoutingSpec
             asDriver = true
           )
         ),
+        1,
         attributesOfIndividual = Some(
           AttributesOfIndividual(
             HouseholdAttributes.EMPTY,
@@ -210,7 +212,8 @@ class TollRoutingSpec
             Modes.BeamMode.WALK,
             asDriver = true
           )
-        )
+        ),
+        1
       )
       router ! request
       val response = expectMsgType[RoutingResponse]

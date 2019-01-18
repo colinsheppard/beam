@@ -5,7 +5,18 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 import akka.actor.Status.{Status, Success}
-import akka.actor.{Actor, ActorLogging, ActorRef, Address, Cancellable, ExtendedActorSystem, Props, RelativeActorPath, RootActorPath, Stash}
+import akka.actor.{
+  Actor,
+  ActorLogging,
+  ActorRef,
+  Address,
+  Cancellable,
+  ExtendedActorSystem,
+  Props,
+  RelativeActorPath,
+  RootActorPath,
+  Stash
+}
 import akka.cluster.ClusterEvent._
 import akka.cluster.{Cluster, Member, MemberStatus}
 import akka.pattern._
@@ -22,7 +33,6 @@ import beam.router.osm.TollCalculator
 import beam.router.r5.R5RoutingWorker
 import beam.sim.BeamServices
 import beam.sim.population.AttributesOfIndividual
-import beam.utils.IdGeneratorImpl
 import com.conveyal.r5.profile.StreetMode
 import com.conveyal.r5.transit.{RouteInfo, TransportNetwork}
 import com.romix.akka.serialization.kryo.KryoSerializer
@@ -448,11 +458,11 @@ object BeamRouter {
     departureTime: Int,
     transitModes: IndexedSeq[BeamMode],
     streetVehicles: IndexedSeq[StreetVehicle],
+    requestId: Int,
     attributesOfIndividual: Option[AttributesOfIndividual] = None,
     streetVehiclesUseIntermodalUse: IntermodalUse = Access,
-    mustParkAtEnd: Boolean = false
+    mustParkAtEnd: Boolean = false,
   ) {
-    val requestId: Int = IdGeneratorImpl.nextId
     lazy val timeValueOfMoney
       : Double = attributesOfIndividual.fold(360.0)(3600.0 / _.valueOfTime) // 360 seconds per Dollar, i.e. 10$/h value of travel time savings
   }
@@ -470,8 +480,7 @@ object BeamRouter {
   case class RoutingResponse(
     itineraries: Seq[EmbodiedBeamTrip],
     requestId: Int
-  ) {
-  }
+  ) {}
 
   object RoutingResponse {
     val dummyRoutingResponse = Some(RoutingResponse(Vector(), java.util.UUID.randomUUID().hashCode()))
