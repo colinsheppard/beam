@@ -319,10 +319,10 @@ class BeamRouter(
         worker ! work
       case embodyWithCurrentTravelTime: EmbodyWithCurrentTravelTime =>
         outstandingWorkIdToOriginalSenderMap.put(
-          embodyWithCurrentTravelTime.id,
+          embodyWithCurrentTravelTime.requestId,
           originalSender
         )
-        outstandingWorkIdToTimeSent.put(embodyWithCurrentTravelTime.id, getCurrentTime)
+        outstandingWorkIdToTimeSent.put(embodyWithCurrentTravelTime.requestId, getCurrentTime)
         worker ! work
       case _ =>
         log.warning(
@@ -429,7 +429,7 @@ object BeamRouter {
     leg: BeamLeg,
     vehicleId: Id[Vehicle],
     vehicleTypeId: Id[BeamVehicleType],
-    id: Int = UUID.randomUUID().hashCode(),
+    requestId: Int,
     mustParkAtEnd: Boolean = false,
     destinationForSplitting: Option[Coord] = None
   )

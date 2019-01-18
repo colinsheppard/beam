@@ -308,8 +308,9 @@ trait ChoosesMode {
                     leg,
                     vehicle.id,
                     vehicle.vehicleTypeId,
+                    beamServices.idGen.nextId,
                     mustParkAtEnd = true,
-                    destinationForSplitting = Some(beamServices.geo.utm2Wgs(nextAct.getCoord))
+                    destinationForSplitting = Some(beamServices.geo.utm2Wgs(nextAct.getCoord)),
                   )
                   parkingRequestId = requestParkingCost(
                     beamServices.geo.wgs2Utm(leg.travelPath.endPoint.loc),
