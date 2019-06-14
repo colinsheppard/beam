@@ -73,7 +73,8 @@ class ModeChoiceMultinomialLogit(val beamServices: BeamServices, val model: Mult
       expectedMaximumUtility = model.getExpectedMaximumUtility(inputData).getOrElse(0)
 
       logger.info(
-        s"""For the person: ${personInfo}
+        s"""
+           |For the person: ${personInfo}
            |attributesOfIndividual: ${attributesOfIndividual.asJson.toString}
            |bestInGroup: ${bestInGroup.asJson.toString}
            |inputData: ${inputData.asJson.toString}
