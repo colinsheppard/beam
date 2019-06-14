@@ -32,25 +32,18 @@ class ModeChoiceMultinomialLogit(val beamServices: BeamServices, val model: Mult
     extends ModeChoiceCalculator
     with ExponentialLazyLogging {
 
-  implicit val HouseholdAttributesFormat = new Format[HouseholdAttributes]
-  implicit val BeamModeFormat = new Format[BeamMode]
-  implicit val AttributesOfIndividualFormat = new Format[AttributesOfIndividual]
-  implicit val ModeCostTimeTransferFormat = new Format[ModeCostTimeTransfer]
-  implicit val MNLSampleFormat = new Format[MultinomialLogit.MNLSample[String]]
-
   var expectedMaximumUtility: Double = 0.0
   val modalBehaviors: ModalBehaviors = beamServices.getModalBehaviors()
 
   override def apply(
     alternatives: IndexedSeq[EmbodiedBeamTrip],
     attributesOfIndividual: AttributesOfIndividual,
-    destinationActivity: Option[Activity],
+    destinationActivity: Option[Activity]
   ): Option[EmbodiedBeamTrip] = {
     if (alternatives.isEmpty) {
       None
     } else {
       val modeCostTimeTransfers = altsToModeCostTimeTransfers(alternatives, attributesOfIndividual, destinationActivity)
-
       val bestInGroup =
       modeCostTimeTransfers groupBy (_.mode) map {
         case (_, group) => group minBy timeAndCost
