@@ -58,7 +58,8 @@ class ParquetScenarioReaderTest extends WordSpec with Matchers with MockitoSugar
         Map(
           "person_id"    -> "1".asInstanceOf[AnyRef],
           "household_id" -> "2".asInstanceOf[AnyRef],
-          "age"          -> 3L.asInstanceOf[AnyRef]
+          "age"          -> 3L.asInstanceOf[AnyRef],
+          "sex"          -> 1L.asInstanceOf[AnyRef],
         ).asJava
       )
       ParquetScenarioReader.toPersonInfo(gr) should be(
