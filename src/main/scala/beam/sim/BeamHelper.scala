@@ -212,10 +212,10 @@ trait BeamHelper extends LazyLogging {
       }
     )
 
-  def loadScenario(beamConfig: BeamConfig) = {
+  def loadScenario(beamConfig: BeamConfig, networkCoordinator: NetworkCoordinator): BeamScenario = {
     val vehicleTypes = maybeScaleTransit(
       beamConfig,
-      readBeamVehicleTypeFile(beamConfig.beam.agentsim.agents.vehicles.vehicleTypesFilePath)
+      readBeamVehicleTypeFile(beamConfig.beam.agentsim.agents.vehicles.vehicleTypesFilePath),
     )
     val vehicleCsvReader = new VehicleCsvReader(beamConfig)
     val baseFilePath = Paths.get(beamConfig.beam.agentsim.agents.vehicles.vehicleTypesFilePath).getParent
@@ -235,7 +235,6 @@ trait BeamHelper extends LazyLogging {
       ZonedDateTime.parse(beamConfig.beam.routing.baseDate)
     )
 
-    val networkCoordinator = buildNetworkCoordinator(beamConfig)
     val transitSchedule = new TransitInitializer(
       beamConfig,
       dates,
@@ -568,7 +567,7 @@ trait BeamHelper extends LazyLogging {
         val externalFolderExists: Boolean = Option(scenarioConfig.folder).exists(new File(_).isDirectory)
         if (externalFolderExists) {
           val emptyScenario = ScenarioBuilder(matsimConfig).withNetwork(networkCoordinator.network).build
-          val beamScenario = loadScenario(beamConfig)
+          val beamScenario = loadScenario(beamConfig, networkCoordinator)
           val scenario = {
             val source = buildUrbansimScenarioSource(new GeoUtilsImpl(beamConfig), beamConfig)
             new UrbanSimScenarioLoader(emptyScenario, beamScenario, source, new GeoUtilsImpl(beamConfig)).loadScenario()
@@ -581,7 +580,7 @@ trait BeamHelper extends LazyLogging {
         fileFormat match {
           case "csv" =>
             val emptyScenario = ScenarioBuilder(matsimConfig).withNetwork(networkCoordinator.network).build
-            val beamScenario = loadScenario(beamConfig)
+            val beamScenario = loadScenario(beamConfig, networkCoordinator)
             val scenario = {
               val source = new BeamScenarioSource(
                 scenarioFolder = scenarioConfig.folder,
@@ -591,7 +590,7 @@ trait BeamHelper extends LazyLogging {
             }.asInstanceOf[MutableScenario]
             (scenario, beamScenario)
           case "xml" =>
-            val beamScenario = loadScenario(beamConfig)
+            val beamScenario = loadScenario(beamConfig, networkCoordinator)
             val scenario = {
               val result = ScenarioUtils.loadScenario(matsimConfig).asInstanceOf[MutableScenario]
               fixDanglingPersons(result)
