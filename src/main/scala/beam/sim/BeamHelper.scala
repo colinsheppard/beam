@@ -455,12 +455,10 @@ trait BeamHelper extends LazyLogging {
 
   def runBeamWithConfig(config: TypesafeConfig): (MatsimConfig, String) = {
     val beamExecutionConfig = setupBeamWithConfig(config)
-    val networkCoordinator: NetworkCoordinator = buildNetworkCoordinator(beamExecutionConfig.beamConfig)
     val (scenario, beamScenario) = buildBeamServicesAndScenario(
       config,
       beamExecutionConfig.beamConfig,
       beamExecutionConfig.matsimConfig,
-      networkCoordinator
     )
     val injector: inject.Injector = buildInjector(config, scenario, beamScenario)
     val services = injector.getInstance(classOf[BeamServices])
@@ -554,7 +552,6 @@ trait BeamHelper extends LazyLogging {
     typesafeConfig: TypesafeConfig,
     beamConfig: BeamConfig,
     matsimConfig: MatsimConfig,
-    networkCoordinator: NetworkCoordinator,
   ): (MutableScenario, BeamScenario) = {
     val scenarioConfig = beamConfig.beam.exchange.scenario
 
@@ -562,6 +559,7 @@ trait BeamHelper extends LazyLogging {
 
     val fileFormat = scenarioConfig.fileFormat
 
+    val networkCoordinator: NetworkCoordinator = buildNetworkCoordinator(beamConfig)
     ProfilingUtils.timed(s"Load scenario using $src/$fileFormat", x => logger.info(x)) {
       if (src == "urbansim") {
         val externalFolderExists: Boolean = Option(scenarioConfig.folder).exists(new File(_).isDirectory)
