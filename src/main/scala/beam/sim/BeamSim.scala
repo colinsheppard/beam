@@ -22,10 +22,12 @@ import beam.sim.metrics.{MetricsPrinter, MetricsSupport}
 import beam.utils.csv.writers._
 import beam.utils.logging.ExponentialLazyLogging
 import beam.utils.scripts.FailFast
-import beam.utils.{DebugLib, NetworkHelper, ProfilingUtils, SummaryVehicleStatsParser}
+import beam.utils.{DebugLib, NetworkHelper, SummaryVehicleStatsParser}
 import com.conveyal.r5.transit.TransportNetwork
 import com.google.inject.Inject
 import com.typesafe.scalalogging.LazyLogging
+import org.matsim.core.controler.OutputDirectoryHierarchy
+import org.matsim.core.scoring.ExperiencedPlansService
 //import com.zaxxer.nuprocess.NuProcess
 import beam.analysis.PythonProcess
 import org.apache.commons.io.FileUtils
@@ -35,18 +37,12 @@ import org.jfree.data.category.DefaultCategoryDataset
 import org.matsim.api.core.v01.Scenario
 import org.matsim.api.core.v01.population.{Activity, Plan}
 import org.matsim.core.api.experimental.events.EventsManager
-import org.matsim.core.controler.corelisteners.DumpDataAtEnd
 import org.matsim.core.controler.events._
-import org.matsim.core.controler.listener.{
-  IterationEndsListener,
-  IterationStartsListener,
-  ShutdownListener,
-  StartupListener
-}
+import org.matsim.core.controler.listener.{IterationEndsListener, IterationStartsListener, ShutdownListener, StartupListener}
 
 import scala.collection.JavaConverters._
-import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ListBuffer
+import scala.collection.{immutable, mutable}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
@@ -57,6 +53,7 @@ class BeamSim @Inject()(
   private val tollCalculator: TollCalculator,
   private val beamServices: BeamServices,
   private val eventsManager: EventsManager,
+  private val controllerIO: OutputDirectoryHierarchy,
   private val scenario: Scenario,
   private val networkHelper: NetworkHelper,
   private val beamOutputDataDescriptionGenerator: BeamOutputDataDescriptionGenerator,
@@ -65,7 +62,8 @@ class BeamSim @Inject()(
   private val beamConfigChangesObservable: BeamConfigChangesObservable,
   private val routeHistory: RouteHistory,
   private val rideHailIterationHistory: RideHailIterationHistory,
-  private val configHolder: BeamConfigHolder
+  private val configHolder: BeamConfigHolder,
+  private val experiencedPlansService: ExperiencedPlansService
 ) extends StartupListener
     with IterationStartsListener
     with IterationEndsListener
@@ -127,7 +125,7 @@ class BeamSim @Inject()(
       agentSimToPhysSimPlanConverter = new AgentSimToPhysSimPlanConverter(
         eventsManager,
         transportNetwork,
-        event.getServices.getControlerIO,
+        controllerIO,
         scenario,
         beamServices,
         beamConfigChangesObservable
@@ -137,7 +135,7 @@ class BeamSim @Inject()(
 
     createGraphsFromEvents = new GraphsStatsAgentSimEventsListener(
       eventsManager,
-      event.getServices.getControlerIO,
+      controllerIO,
       beamServices,
       beamServices.beamConfig
     )
@@ -146,7 +144,7 @@ class BeamSim @Inject()(
     expectedDisutilityHeatMapDataCollector = new ExpectedMaxUtilityHeatMap(
       eventsManager,
       beamServices.networkHelper,
-      event.getServices.getControlerIO,
+      controllerIO,
       beamServices.beamConfig.beam.outputs.writeEventsInterval
     )
 
@@ -159,18 +157,14 @@ class BeamSim @Inject()(
 
     delayMetricAnalysis = new DelayMetricAnalysis(
       eventsManager,
-      event.getServices.getControlerIO,
+      controllerIO,
       networkHelper
     )
 
-    val controllerIO = event.getServices.getControlerIO
     PopulationCsvWriter.toCsv(scenario, controllerIO.getOutputFilename("population.csv.gz"))
     VehiclesCsvWriter(beamServices).toCsv(scenario, controllerIO.getOutputFilename("vehicles.csv.gz"))
     HouseholdsCsvWriter.toCsv(scenario, controllerIO.getOutputFilename("households.csv.gz"))
     NetworkCsvWriter.toCsv(scenario, controllerIO.getOutputFilename("network.csv.gz"))
-
-    dumpMatsimStuffAtTheBeginningOfSimulation()
-
     FailFast.run(beamServices)
   }
 
@@ -191,7 +185,6 @@ class BeamSim @Inject()(
 
     val iterationNumber = event.getIteration
 
-    val controllerIO = event.getServices.getControlerIO
     if (isFirstIteration(iterationNumber)) {
       PlansCsvWriter.toCsv(scenario, controllerIO.getOutputFilename("plans.csv.gz"))
     }
@@ -206,6 +199,7 @@ class BeamSim @Inject()(
 
   override def notifyIterationEnds(event: IterationEndsEvent): Unit = {
     val beamConfig: BeamConfig = beamConfigChangesObservable.getUpdatedBeamConfig
+    experiencedPlansService.writeExperiencedPlans(controllerIO.getIterationFilename(event.getIteration, "experienced_plans.xml.gz"))
 
     travelTimeObserved.notifyIterationEnds(event)
 
@@ -214,7 +208,7 @@ class BeamSim @Inject()(
     if (shouldWritePlansAtCurrentIteration(event.getIteration)) {
       PlansCsvWriter.toCsv(
         scenario,
-        beamServices.matsimServices.getControlerIO.getIterationFilename(event.getIteration, "plans.csv.gz")
+        beamServices.controlerIO.getIterationFilename(event.getIteration, "plans.csv.gz")
       )
     }
 
@@ -228,17 +222,17 @@ class BeamSim @Inject()(
         modalityStyleStats.processData(scenario.getPopulation, event)
         modalityStyleStats.buildModalityStyleGraph()
       }
-      createGraphsFromEvents.createGraphs(event)
+      createGraphsFromEvents.createGraphs(event.getIteration)
 
       iterationSummaryStats += iterationStatsProviders
         .flatMap(_.getSummaryStats.asScala)
         .toMap
 
       val summaryVehicleStatsFile =
-        Paths.get(event.getServices.getControlerIO.getOutputFilename("summaryVehicleStats.csv")).toFile
+        Paths.get(controllerIO.getOutputFilename("summaryVehicleStats.csv")).toFile
       val unProcessedStats = writeSummaryVehicleStats(summaryVehicleStatsFile)
 
-      val summaryStatsFile = Paths.get(event.getServices.getControlerIO.getOutputFilename("summaryStats.csv")).toFile
+      val summaryStatsFile = Paths.get(controllerIO.getOutputFilename("summaryStats.csv")).toFile
       writeSummaryStats(summaryStatsFile, unProcessedStats)
 
       iterationSummaryStats.flatMap(_.keySet).distinct.foreach { x =>
@@ -303,7 +297,7 @@ class BeamSim @Inject()(
       Nil
     )
     //rename output files generated by matsim to follow the standard naming convention of camel case
-    renameGeneratedOutputFiles(event)
+    renameGeneratedOutputFilesAfterIteration(event.getIteration)
 
     if (beamConfig.beam.outputs.writeGraphs) {
       // generateRepositioningGraphs(event)
@@ -312,42 +306,21 @@ class BeamSim @Inject()(
     logger.info("Ending Iteration")
     delayMetricAnalysis.generateDelayAnalysis(event)
 
-    writeEventsAnalysisUsing(event)
+    writeEventsAnalysisUsing(event.getIteration)
   }
 
-  private def writeEventsAnalysisUsing(event: IterationEndsEvent) = {
+  private def writeEventsAnalysisUsing(iteration: Int) = {
     if (beamServices.beamConfig.beam.outputs.writeAnalysis) {
       val writeEventsInterval = beamServices.beamConfig.beam.outputs.writeEventsInterval
-      val writeEventAnalysisInThisIteration = writeEventsInterval > 0 && event.getIteration % writeEventsInterval == 0
+      val writeEventAnalysisInThisIteration = writeEventsInterval > 0 && iteration % writeEventsInterval == 0
       if (writeEventAnalysisInThisIteration) {
         val currentEventsFilePath =
-          event.getServices.getControlerIO.getIterationFilename(event.getServices.getIterationNumber, "events.csv")
+          controllerIO.getIterationFilename(iteration, "events.csv")
         val pythonProcess = beam.analysis.AnalysisProcessor.firePythonScriptAsync(
           "src/main/python/events_analysis/analyze_events.py",
           if ((new File(currentEventsFilePath)).exists) currentEventsFilePath else currentEventsFilePath + ".gz"
         )
         runningPythonScripts += pythonProcess
-      }
-    }
-  }
-
-  private def dumpMatsimStuffAtTheBeginningOfSimulation(): Unit = {
-    ProfilingUtils.timed(
-      s"dumpMatsimStuffAtTheBeginningOfSimulation in the beginning of simulation",
-      x => logger.info(x)
-    ) {
-      // `DumpDataAtEnd` during `notifyShutdown` dumps network, plans, person attributes and other things.
-      // Reusing it to get `outputPersonAttributes.xml.gz` which is needed for warmstart
-      val dumper = beamServices.injector.getInstance(classOf[DumpDataAtEnd])
-      dumper match {
-        case listener: ShutdownListener =>
-          val event = new ShutdownEvent(beamServices.matsimServices, false)
-          // Create files
-          listener.notifyShutdown(event)
-          // Rename files
-          renameGeneratedOutputFiles(event)
-        case x =>
-          logger.warn("dumper is not `ShutdownListener`")
       }
     }
   }
@@ -363,7 +336,7 @@ class BeamSim @Inject()(
     val lastIteration = beamServices.beamConfig.matsim.modules.controler.lastIteration
 
     logger.info("Generating html page to compare graphs (across all iterations)")
-    BeamGraphComparator.generateGraphComparisonHtmlPage(event, firstIteration, lastIteration)
+    BeamGraphComparator.generateGraphComparisonHtmlPage(controllerIO, firstIteration, lastIteration)
     beamOutputDataDescriptionGenerator.generateDescriptors(event)
 
     Await.result(actorSystem.terminate(), Duration.Inf)
@@ -377,10 +350,7 @@ class BeamSim @Inject()(
     )
 
     //rename output files generated by matsim to follow the standard naming convention of camel case
-    val outputFiles = renameGeneratedOutputFiles(event)
-
-    val scenario = event.getServices.getScenario
-    val controllerIO = event.getServices.getControlerIO
+    renameGeneratedOutputFilesAtShutdown()
 
     outputFilesToDelete.foreach(deleteOutputFile)
 
@@ -454,7 +424,7 @@ class BeamSim @Inject()(
 
   def createSummaryStatsGraph(fileName: String, iteration: Int): Unit = {
     val fileNamePath =
-      beamServices.matsimServices.getControlerIO.getOutputFilename(fileName.replaceAll("[/: ]", "_") + ".png")
+      beamServices.controlerIO.getOutputFilename(fileName.replaceAll("[/: ]", "_") + ".png")
     val index = fileNamePath.lastIndexOf("/")
     val outDir = new File(fileNamePath.substring(0, index) + "/summaryStats")
     val directoryName = fileName.split("_")(0)
@@ -522,35 +492,39 @@ class BeamSim @Inject()(
 
   /**
     * Rename output files generated by libraries to match the standard naming convention of camel case.
-    *
-    * @param event Any controller event
     */
-  private def renameGeneratedOutputFiles(event: ControlerEvent): Seq[File] = {
-    val filesToBeRenamed: Array[File] = event match {
-      case _ if event.isInstanceOf[IterationEndsEvent] =>
-        val iterationEvent = event.asInstanceOf[IterationEndsEvent]
+  private def renameGeneratedOutputFilesAfterIteration(iteration: Int): Seq[File] = {
+    val filesToBeRenamed: Array[File] = {
         val outputIterationFileNameRegex = List(s"legHistogram(.*)", "experienced(.*)")
         // filter files that match output file name regex and are to be renamed
         FileUtils
-          .getFile(new File(event.getServices.getControlerIO.getIterationPath(iterationEvent.getIteration)))
+          .getFile(new File(controllerIO.getIterationPath(iteration)))
           .listFiles()
           .filter(
             f =>
               outputIterationFileNameRegex.exists(
                 f.getName
-                  .replace(event.getServices.getIterationNumber.toInt + ".", "")
+                  .replace(iteration + ".", "")
                   .matches(_)
             )
           )
-      case _ if event.isInstanceOf[ShutdownEvent] =>
-        val shutdownEvent = event.asInstanceOf[ShutdownEvent]
+    }
+    renameFiles(filesToBeRenamed)
+  }
+
+  private def renameGeneratedOutputFilesAtShutdown(): Seq[File] = {
+    val filesToBeRenamed: Array[File] = {
         val outputFileNameRegex = List("output(.*)")
         // filter files that match output file name regex and are to be renamed
         FileUtils
-          .getFile(new File(shutdownEvent.getServices.getControlerIO.getOutputPath))
+          .getFile(new File(controllerIO.getOutputPath))
           .listFiles()
           .filter(f => outputFileNameRegex.exists(f.getName.matches(_)))
     }
+    renameFiles(filesToBeRenamed)
+  }
+
+  private def renameFiles(filesToBeRenamed: Array[File]) = {
     filesToBeRenamed
       .map { file =>
         //rename each file to follow the camel case

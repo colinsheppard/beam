@@ -45,18 +45,12 @@ class EventsFileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with 
     injector = buildInjector(config, beamExecutionConfig.beamConfig, scenario, beamScenario)
     val services = buildBeamServices(injector, scenario)
 
-    runBeam(services, scenario, beamScenario, scenario.getConfig.controler().getOutputDirectory)
+    runBeam(services, injector, scenario, beamScenario, scenario.getConfig.controler().getOutputDirectory)
     personHouseholds = scenario.getHouseholds.getHouseholds
       .values()
       .asScala
       .flatMap(h => h.getMemberIds.asScala.map(_ -> h))
       .toMap
-  }
-
-  override def afterAll(): Unit = {
-    val travelDistanceStats = injector.getInstance(classOf[org.matsim.analysis.TravelDistanceStats])
-    if (travelDistanceStats != null)
-      travelDistanceStats.close()
   }
 
   it should "contain the same bus trips entries" in {
