@@ -1,6 +1,6 @@
 package beam.utils.scenario
 
-import beam.sim.common.GeoUtils
+import beam.sim.common.{GeoUtils, GeoUtilsImpl}
 import beam.sim.config.BeamConfig
 import beam.utils.TestConfigUtils.testConfig
 import org.mockito.Mockito.when
@@ -16,9 +16,7 @@ class UrbanSimScenarioLoaderTest extends AsyncWordSpec with Matchers with Mockit
 
   val scenarioSource = mock[ScenarioSource]
 
-  val geoUtils = new GeoUtils {
-    override def localCRS: String = "epsg:32631"
-  }
+  val geoUtils = new GeoUtilsImpl(beamConfig)
 
   val urbanSimScenario = new UrbanSimScenarioLoader(mutableScenario, beamScenario, scenarioSource, geoUtils)
 
