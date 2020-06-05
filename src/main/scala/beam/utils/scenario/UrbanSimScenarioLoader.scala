@@ -258,7 +258,7 @@ class UrbanSimScenarioLoader(
     )
   }
 
-  private def assignVehicles(
+  private[scenario] def assignVehicles(
     households: Iterable[HouseholdInfo],
     householdIdToPersons: Map[HouseholdId, Iterable[PersonInfo]],
     householdIdToPersonScore: Map[HouseholdId, Iterable[(PersonId, Double)]]
@@ -271,7 +271,7 @@ class UrbanSimScenarioLoader(
         val rand = new Random(beamScenario.beamConfig.matsim.modules.global.randomSeed)
         val hh_car_count =
           collection.mutable.Map(collection.mutable.ArrayBuffer(households.toSeq: _*).groupBy(_.cars).toSeq: _*)
-        val totalCars = households.foldLeft(0)(_ + _.cars)
+        val totalCars = households.map(_.cars).sum
 
         val goalCarTotal = math
           .round(beamScenario.beamConfig.beam.agentsim.agents.vehicles.fractionOfInitialVehicleFleet * totalCars)
