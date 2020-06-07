@@ -30,13 +30,13 @@ class UrbanSimScenarioLoader(
   val geo: GeoUtils
 ) extends LazyLogging {
 
-  implicit val ex: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  private implicit val ex: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
-  val population: Population = scenario.getPopulation
+  private val population: Population = scenario.getPopulation
 
-  val availableModes: String = BeamMode.allModes.map(_.value).mkString(",")
+  private val availableModes: String = BeamMode.allModes.map(_.value).mkString(",")
 
-  val rand: Random = new Random(beamScenario.beamConfig.matsim.modules.global.randomSeed)
+  private val rand: Random = new Random(beamScenario.beamConfig.matsim.modules.global.randomSeed)
 
   def loadScenario(): Scenario = {
     clear()
@@ -243,6 +243,13 @@ class UrbanSimScenarioLoader(
     PersonTravelStats(homeCoord, planTripStats)
   }
 
+  /**
+    *
+    * @param households list of household ids
+    * @param householdIdToPersons map of household id into list of person info
+    * @param householdIdToPersonScore map of household id into list of personid -> commute distance
+    * @return sequence of household info -> new number of vehicles to assign
+    */
   private[scenario] def assignVehicles(
     households: Iterable[HouseholdInfo],
     householdIdToPersons: Map[HouseholdId, Iterable[PersonInfo]],
@@ -251,22 +258,20 @@ class UrbanSimScenarioLoader(
     val fractionOfInitialVehicleFleet =
       beamScenario.beamConfig.beam.agentsim.agents.vehicles.fractionOfInitialVehicleFleet
 
-    val rand = new Random(beamScenario.beamConfig.matsim.modules.global.randomSeed)
-
     beamScenario.beamConfig.beam.agentsim.agents.vehicles.downsamplingMethod match {
       case "SECONDARY_VEHICLES_FIRST" =>
         val numberOfWorkers = households.map(x => householdIdToPersons(x.householdId).size).sum
         val numberOfWorkersWithVehicles =
           households.map(x => math.min(x.cars, householdIdToPersons(x.householdId).size)).sum
         val numberOfCarsToHouseHoldInfos: mutable.Map[Int, ArrayBuffer[HouseholdInfo]] =
-          collection.mutable.Map(collection.mutable.ArrayBuffer(households.toSeq: _*).groupBy(_.cars).toSeq: _*)
+          mutable.Map(mutable.ArrayBuffer(households.toSeq: _*).groupBy(_.cars).toSeq: _*)
         val totalCars = households.map(_.cars).sum
 
         val goalCarTotal = math.round(fractionOfInitialVehicleFleet * totalCars).toInt
         if (fractionOfInitialVehicleFleet < 1.0) {
           val numberOfWorkVehiclesToBeRemoved = math.max(numberOfWorkersWithVehicles - goalCarTotal, 0)
           val numberOfExcessVehiclesToBeRemoved = totalCars - goalCarTotal - numberOfWorkVehiclesToBeRemoved
-          val personsToGetCarsRemoved = households
+          val personsToGetCarsRemoved: Set[PersonId] = households
             .flatMap(
               householdInfo =>
                 householdIdToPersonScore(householdInfo.householdId).toSeq
@@ -287,23 +292,29 @@ class UrbanSimScenarioLoader(
             .groupBy { case (householdId, _) => householdId }
 
           var currentTotalCars = totalCars
-          numberOfCarsToHouseHoldInfos.keys.toSeq.sorted.reverse.foreach { key => // start with households with the most vehicles
-            if ((currentTotalCars > (goalCarTotal + numberOfWorkVehiclesToBeRemoved)) & key > 0) {
-              val numberOfHouseholdsWithThisManyVehicles = numberOfCarsToHouseHoldInfos(key).size
+          numberOfCarsToHouseHoldInfos.keys.toSeq
+            .filter(_ > 0)
+            // start with households with the most vehicles
+            .sorted(Ordering.Int.reverse)
+            .takeWhile(_ => currentTotalCars > (goalCarTotal + numberOfWorkVehiclesToBeRemoved))
+            .foreach { numberOfCars =>
+              val numberOfHouseholdsWithThisManyVehicles = numberOfCarsToHouseHoldInfos(numberOfCars).size
 
               val (householdsWithExcessVehicles, householdsWithCorrectNumberOfVehicles) =
-                numberOfCarsToHouseHoldInfos(key).partition(x => key > householdIdToPersons(x.householdId).size)
+                numberOfCarsToHouseHoldInfos(numberOfCars).partition(
+                  x => numberOfCars > householdIdToPersons(x.householdId).size
+                )
               val numberOfExcessVehicles = householdsWithExcessVehicles.size
               logger.info(
-                s"Identified $numberOfExcessVehicles excess vehicles from the $numberOfHouseholdsWithThisManyVehicles households with $key vehicles"
+                s"Identified $numberOfExcessVehicles excess vehicles from the $numberOfHouseholdsWithThisManyVehicles households with $numberOfCars vehicles"
               )
               if (currentTotalCars - numberOfExcessVehicles > goalCarTotal) {
                 logger.info(
                   s"Removing all $numberOfExcessVehicles excess vehicles"
                 )
                 currentTotalCars -= numberOfExcessVehicles
-                numberOfCarsToHouseHoldInfos(key - 1) ++= householdsWithExcessVehicles
-                numberOfCarsToHouseHoldInfos(key) = householdsWithCorrectNumberOfVehicles
+                numberOfCarsToHouseHoldInfos(numberOfCars - 1) ++= householdsWithExcessVehicles
+                numberOfCarsToHouseHoldInfos(numberOfCars) = householdsWithCorrectNumberOfVehicles
               } else {
                 val householdsInGroup = householdsWithExcessVehicles.size
                 val numberToRemain = householdsInGroup - (currentTotalCars - goalCarTotal)
@@ -311,15 +322,18 @@ class UrbanSimScenarioLoader(
                   s"Removing all but $numberToRemain of the $numberOfExcessVehicles excess vehicles"
                 )
                 val shuffled = rand.shuffle(householdsWithExcessVehicles)
-                numberOfCarsToHouseHoldInfos(key) = shuffled.take(numberToRemain) ++ householdsWithCorrectNumberOfVehicles
-                numberOfCarsToHouseHoldInfos(key - 1) ++= shuffled.takeRight(householdsInGroup - numberToRemain)
+                numberOfCarsToHouseHoldInfos(numberOfCars) = shuffled.take(numberToRemain) ++ householdsWithCorrectNumberOfVehicles
+                numberOfCarsToHouseHoldInfos(numberOfCars - 1) ++= shuffled.takeRight(
+                  householdsInGroup - numberToRemain
+                )
                 currentTotalCars -= (householdsInGroup - numberToRemain)
               }
             }
-          }
           logger.info(
             s"Currently $currentTotalCars are left, $numberOfWorkVehiclesToBeRemoved work vehicles are yet to be removed"
           )
+
+          //TODO REFACTOR THIS PIECE
           numberOfCarsToHouseHoldInfos.keys.toSeq
             .filter(_ > 0)
             .sorted
@@ -346,8 +360,9 @@ class UrbanSimScenarioLoader(
             math.min(numberOfWorkers - numberOfWorkersWithVehicles, goalCarTotal - totalCars)
           val likelihoodToCreateVehicle = numberOfWorkVehiclesToCreate.toDouble / (numberOfWorkers - numberOfWorkersWithVehicles).toDouble
           var currentTotalCars = totalCars
-          numberOfCarsToHouseHoldInfos.keys.toSeq.sorted.reverse
+          numberOfCarsToHouseHoldInfos.keys.toSeq
             .filter(_ > 0)
+            .sorted(Ordering.Int.reverse)
             .foreach { nCars =>
               numberOfCarsToHouseHoldInfos(nCars) = numberOfCarsToHouseHoldInfos(nCars).filter { hh =>
                 val nWorkers = householdIdToPersons(hh.householdId).size
