@@ -116,10 +116,10 @@ class UrbanSimScenarioLoader(
         .groupBy(_.personId)
         .map(x => (x._1, plansToTravelStats(x._2)))
 
-    val householdIdToPersonScore: Map[HouseholdId, Iterable[(PersonId, Double)]] =
-      householdIdToPersons.map {
-        case (hhId, persons) =>
-          (hhId, persons.map(x => (x.personId, getPersonScore(x, personIdToTravelStats(x.personId)))))
+    val personId2Score: Map[PersonId, Double] =
+      householdIdToPersons.flatMap {
+        case (_, persons) =>
+          persons.map(x => x.personId -> getPersonScore(x, personIdToTravelStats(x.personId)))
       }
 
     val scaleFactor = beamScenario.beamConfig.beam.agentsim.agents.vehicles.fractionOfInitialVehicleFleet
@@ -128,9 +128,9 @@ class UrbanSimScenarioLoader(
     val realDistribution: UniformRealDistribution = new UniformRealDistribution()
     realDistribution.reseedRandomGenerator(beamScenario.beamConfig.matsim.modules.global.randomSeed)
 
-    assignVehicles(households, householdIdToPersons, householdIdToPersonScore).foreach {
+    assignVehicles(households, householdIdToPersons, personId2Score).foreach {
       case (householdInfo, nVehicles) =>
-        val id = Id.create(householdInfo.householdId.id, classOf[org.matsim.households.Household])
+        val id = Id.create(householdInfo.householdId.id, classOf[Household])
         val household = new HouseholdsFactoryImpl().createHousehold(id)
         val coord = if (beamScenario.beamConfig.beam.exchange.scenario.convertWgs2Utm) {
           geo.wgs2Utm(new Coord(householdInfo.locationX, householdInfo.locationY))
@@ -247,13 +247,13 @@ class UrbanSimScenarioLoader(
     *
     * @param households list of household ids
     * @param householdIdToPersons map of household id into list of person info
-    * @param householdIdToPersonScore map of household id into list of personid -> commute distance
+    * @param personId2Score map personId -> commute distance
     * @return sequence of household info -> new number of vehicles to assign
     */
   private[scenario] def assignVehicles(
     households: Iterable[HouseholdInfo],
     householdIdToPersons: Map[HouseholdId, Iterable[PersonInfo]],
-    householdIdToPersonScore: Map[HouseholdId, Iterable[(PersonId, Double)]]
+    personId2Score: Map[PersonId, Double]
   ): Iterable[(HouseholdInfo, Int)] = {
     val fractionOfInitialVehicleFleet =
       beamScenario.beamConfig.beam.agentsim.agents.vehicles.fractionOfInitialVehicleFleet
@@ -274,7 +274,9 @@ class UrbanSimScenarioLoader(
           val personsToGetCarsRemoved: Set[PersonId] = households
             .flatMap(
               householdInfo =>
-                householdIdToPersonScore(householdInfo.householdId).toSeq
+                householdIdToPersons(householdInfo.householdId)
+                  .map(p => p.personId -> personId2Score(p.personId))
+                  .toSeq
                   .sortBy { case (_, commuteDistance) => commuteDistance }
                   .takeRight(householdInfo.cars) // for each household, assign vehicles to the people with the highest commute distances
             )
@@ -313,7 +315,7 @@ class UrbanSimScenarioLoader(
                   s"Removing all $numberOfExcessVehicles excess vehicles"
                 )
                 currentTotalCars -= numberOfExcessVehicles
-                numberOfCarsToHouseHoldInfos(numberOfCars - 1) ++= householdsWithExcessVehicles
+                numberOfCarsToHouseHoldInfos.getOrElseUpdate(numberOfCars - 1, ArrayBuffer()) ++= householdsWithExcessVehicles
                 numberOfCarsToHouseHoldInfos(numberOfCars) = householdsWithCorrectNumberOfVehicles
               } else {
                 val householdsInGroup = householdsWithExcessVehicles.size
@@ -323,7 +325,7 @@ class UrbanSimScenarioLoader(
                 )
                 val shuffled = rand.shuffle(householdsWithExcessVehicles)
                 numberOfCarsToHouseHoldInfos(numberOfCars) = shuffled.take(numberToRemain) ++ householdsWithCorrectNumberOfVehicles
-                numberOfCarsToHouseHoldInfos(numberOfCars - 1) ++= shuffled.takeRight(
+                numberOfCarsToHouseHoldInfos.getOrElseUpdate(numberOfCars - 1, ArrayBuffer()) ++= shuffled.takeRight(
                   householdsInGroup - numberToRemain
                 )
                 currentTotalCars -= (householdsInGroup - numberToRemain)
@@ -364,6 +366,7 @@ class UrbanSimScenarioLoader(
             .filter(_ > 0)
             .sorted(Ordering.Int.reverse)
             .foreach { nCars =>
+              //TODO REFACTOR THIS PIECE
               numberOfCarsToHouseHoldInfos(nCars) = numberOfCarsToHouseHoldInfos(nCars).filter { hh =>
                 val nWorkers = householdIdToPersons(hh.householdId).size
                 if (nWorkers > nCars) {
@@ -409,7 +412,11 @@ class UrbanSimScenarioLoader(
   }
 
   private def drawFromBinomial(randomSeed: Random, nTrials: Int, p: Double): Int = {
-    Seq.fill(nTrials)(randomSeed.nextDouble).count(_ < p)
+    var res = 0
+    for (_ <- 0 to nTrials) {
+      if (randomSeed.nextDouble() < p) res += 1
+    }
+    res
   }
 
   private[utils] def applyPersons(persons: Iterable[PersonInfo]): Unit = {
