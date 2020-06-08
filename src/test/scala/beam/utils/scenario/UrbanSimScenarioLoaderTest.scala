@@ -107,6 +107,45 @@ class UrbanSimScenarioLoaderTest extends AsyncWordSpec with Matchers with Mockit
       res.toMap.values.sum shouldBe 8
     }
 
+    "assign svehicles properly in case of fractionOfInitialVehicleFleet >= 1.0 and downsamplingMethod : SECONDARY_VEHICLES_FIRST" in {
+      when(beamScenario.beamConfig).thenReturn(getConfig(5.0))
+      val urbanSimScenario = new UrbanSimScenarioLoader(mutableScenario, beamScenario, scenarioSource, geoUtils)
+
+      val houseHolds = Seq(
+        household(1),
+        household(0)
+      )
+
+      val h2ps = houseHolds.map { h =>
+        h.householdId -> List(person(h.householdId), person(h.householdId))
+      }.toMap
+
+      val people2Score = h2ps.values.flatten.map(_.personId -> idIter.next() * 10.0).toMap
+
+      val res = urbanSimScenario.assignVehicles(houseHolds, h2ps, people2Score)
+      res.toMap.values.sum shouldBe 4
+    }
+
+    "assign svehicles properly in dcase of fractionOfInitialVehicleFleet >= 1.0 and downsamplingMethod : SECONDARY_VEHICLES_FIRST" in {
+      when(beamScenario.beamConfig).thenReturn(getConfig(5.0))
+      val urbanSimScenario = new UrbanSimScenarioLoader(mutableScenario, beamScenario, scenarioSource, geoUtils)
+
+      val houseHolds = Seq(
+        household(0),
+        household(1),
+        household(2)
+      )
+
+      val h2ps = houseHolds.map { h =>
+        h.householdId -> List(person(h.householdId), person(h.householdId))
+      }.toMap
+
+      val people2Score = h2ps.values.flatten.map(_.personId -> idIter.next() * 10.0).toMap
+
+      val res = urbanSimScenario.assignVehicles(houseHolds, h2ps, people2Score)
+      res.toMap.values.sum shouldBe 6
+    }
+
 //    "assign vehicles properly in case of downsamplingMethod : RANDOM" in {
 //      val houseHolds = Seq(
 //        household(2),

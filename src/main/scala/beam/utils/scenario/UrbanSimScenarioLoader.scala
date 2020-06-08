@@ -292,7 +292,7 @@ class UrbanSimScenarioLoader(
           val householdIdToPersonToHaveVehicleRemoved = householdIdToPersons
             .map { case (householdId, persons) => persons.map(person => householdId -> person) }
             .flatten
-            .filter{case (_, personId) =>  personsToGetCarsRemoved.contains(personId.personId)}
+            .filter { case (_, personId) => personsToGetCarsRemoved.contains(personId.personId) }
             .groupBy { case (householdId, _) => householdId }
 
           var currentTotalCars = totalCars
@@ -361,20 +361,18 @@ class UrbanSimScenarioLoader(
           val likelihoodToCreateVehicle = numberOfWorkVehiclesToCreate.toDouble / (numberOfWorkers - numberOfWorkersWithVehicles).toDouble
           var currentTotalCars = totalCars
           numberOfCars2HouseholdIds.keys.toSeq.sorted.reverse.foreach { numberOfCars =>
-            if (numberOfCars > 0) {
-              numberOfCars2HouseholdIds(numberOfCars) = numberOfCars2HouseholdIds(numberOfCars).filter { hh =>
-                val nWorkers = householdIdToPersons(hh.householdId).size
-                if (nWorkers > numberOfCars) {
-                  val numToCreate = drawFromBinomial(nWorkers - numberOfCars, likelihoodToCreateVehicle)
-                  if (numToCreate == 0) {
-                    true
-                  } else {
-                    numberOfCars2HouseholdIds.getOrElseUpdate(numberOfCars + numToCreate, ArrayBuffer()) += hh
-                    currentTotalCars += numToCreate
-                    false
-                  }
-                } else { true }
-              }
+            numberOfCars2HouseholdIds(numberOfCars) = numberOfCars2HouseholdIds(numberOfCars).filter { hh =>
+              val nWorkers = householdIdToPersons(hh.householdId).size
+              if (nWorkers > numberOfCars) {
+                val numToCreate = drawFromBinomial(nWorkers - numberOfCars, likelihoodToCreateVehicle)
+                if (numToCreate == 0) {
+                  true
+                } else {
+                  numberOfCars2HouseholdIds.getOrElseUpdate(numberOfCars + numToCreate, ArrayBuffer()) += hh
+                  currentTotalCars += numToCreate
+                  false
+                }
+              } else { true }
             }
           }
           logger.info(
