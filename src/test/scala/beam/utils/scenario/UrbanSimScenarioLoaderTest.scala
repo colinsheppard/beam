@@ -62,6 +62,27 @@ class UrbanSimScenarioLoaderTest extends AsyncWordSpec with Matchers with Mockit
       val people2Score = h2ps.values.flatten.map(_.personId -> idIter.next() * 10.0).toMap
 
       val res = urbanSimScenario.assignVehicles(houseHolds, h2ps, people2Score)
+      res.toMap.values.sum shouldBe 20
+    }
+
+    "assign vehicles properly in ca121se of fract9ionOfInitialVehicleFleet < 1.0 and downsamplingMethod : SECONDARY_VEHICLES_FIRST" in {
+      when(beamScenario.beamConfig).thenReturn(getConfig(0.5))
+      val urbanSimScenario = new UrbanSimScenarioLoader(mutableScenario, beamScenario, scenarioSource, geoUtils)
+
+      val houseHolds = Seq(
+        household(1),
+        household(2),
+        household(3),
+        household(4)
+      )
+
+      val h2ps = houseHolds.map { h =>
+        h.householdId -> List(person(h.householdId), person(h.householdId))
+      }.toMap
+
+      val people2Score = h2ps.values.flatten.map(_.personId -> idIter.next() * 10.0).toMap
+
+      val res = urbanSimScenario.assignVehicles(houseHolds, h2ps, people2Score)
       res.toMap.values.sum shouldBe 5
     }
 
