@@ -367,20 +367,21 @@ class UrbanSimScenarioLoader(
             min(numberOfWorkers - numberOfWorkersWithVehicles, goalCarTotal - totalCars)
           val likelihoodToCreateVehicle = numberOfWorkVehiclesToCreate.toDouble / (numberOfWorkers - numberOfWorkersWithVehicles).toDouble
           var currentTotalCars = totalCars
-          numberOfCars2HouseholdIds.keys.toSeq.sorted.reverse.foreach { numberOfCars =>
-            numberOfCars2HouseholdIds(numberOfCars) = numberOfCars2HouseholdIds(numberOfCars).filter { hh =>
+          numberOfCars2HouseholdIds.keys.toSeq.sorted(Ordering[Int].reverse).foreach { numberOfCars =>
+            val newHouseHolds = new mutable.ArrayBuffer[HouseholdInfo]()
+
+            numberOfCars2HouseholdIds(numberOfCars).foreach { hh =>
               val nWorkers = householdIdToPersons(hh.householdId).size
-              if (nWorkers > numberOfCars) {
-                val numToCreate = drawFromBinomial(nWorkers - numberOfCars, likelihoodToCreateVehicle)
-                if (numToCreate == 0) {
-                  true
-                } else {
-                  numberOfCars2HouseholdIds.getOrElseUpdate(numberOfCars + numToCreate, ArrayBuffer()) += hh
-                  currentTotalCars += numToCreate
-                  false
-                }
-              } else { true }
+              val numToCreate = drawFromBinomial(nWorkers - numberOfCars, likelihoodToCreateVehicle)
+              if (nWorkers <= numberOfCars || numToCreate == 0) {
+                newHouseHolds += hh
+              } else {
+                numberOfCars2HouseholdIds.getOrElseUpdate(numberOfCars + numToCreate, ArrayBuffer()) += hh
+                currentTotalCars += numToCreate
+              }
             }
+
+            numberOfCars2HouseholdIds(numberOfCars) = newHouseHolds
           }
           logger.info(
             s"Originally had $numberOfWorkersWithVehicles work vehicles and now have $currentTotalCars of them, with a goal of making $numberOfWorkVehiclesToCreate"
