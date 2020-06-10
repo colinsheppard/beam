@@ -334,27 +334,34 @@ class UrbanSimScenarioLoader(
             s"Currently $currentTotalCars are left, $numberOfWorkVehiclesToBeRemoved work vehicles are yet to be removed"
           )
 
-          currentNumberOfCars = numberOfCars2HouseholdIds.keys.max
-          while (currentNumberOfCars > 0 && currentTotalCars > goalCarTotal) {
-            val initialNumberOfHouseholds = numberOfCars2HouseholdIds(currentNumberOfCars).size
-            numberOfCars2HouseholdIds(currentNumberOfCars) = numberOfCars2HouseholdIds(currentNumberOfCars).filter(
-              hh =>
-                householdIdToPersonToHaveVehicleRemoved.get(hh.householdId) match {
-                  case Some(personIdsToRemove) =>
-                    numberOfCars2HouseholdIds
-                      .getOrElseUpdate(currentNumberOfCars - personIdsToRemove.size, ArrayBuffer()) += hh
-                    currentTotalCars -= personIdsToRemove.size
-                    false
-                  case None =>
-                    true
+          numberOfCars2HouseholdIds.keys.toStream
+            .sorted(Ordering[Int].reverse)
+            .takeWhile(currentNumberOfCars => currentNumberOfCars > 0 && currentTotalCars > goalCarTotal)
+            .filter(numberOfCars2HouseholdIds.contains)
+            .foreach { currentNumberOfCars =>
+              val initialNumberOfHouseholds = numberOfCars2HouseholdIds(currentNumberOfCars).size
+              if (initialNumberOfHouseholds != 0) {
+                val newHouseHolds = new mutable.ArrayBuffer[HouseholdInfo]()
+
+                numberOfCars2HouseholdIds(currentNumberOfCars).foreach { hh =>
+                  val personIdsToRemove = householdIdToPersonToHaveVehicleRemoved.getOrElse(hh.householdId, Nil)
+                  val carsToRemove = min(personIdsToRemove.size, currentTotalCars - goalCarTotal)
+                  if (carsToRemove > 0) {
+                    numberOfCars2HouseholdIds.getOrElseUpdate(currentNumberOfCars - carsToRemove, ArrayBuffer()) += hh
+                    currentTotalCars -= carsToRemove
+                  } else {
+                    newHouseHolds += hh
+                  }
+
+                  numberOfCars2HouseholdIds(currentNumberOfCars) = newHouseHolds
+                }
+
+                val nRemoved = initialNumberOfHouseholds - newHouseHolds.size
+                logger.info(
+                  s"Originally had $initialNumberOfHouseholds work vehicles from households with $currentNumberOfCars workers, removed vehicles from $nRemoved of them"
+                )
               }
-            )
-            val nRemoved = initialNumberOfHouseholds - numberOfCars2HouseholdIds(currentNumberOfCars).size
-            logger.info(
-              s"Originally had $initialNumberOfHouseholds work vehicles from households with $currentNumberOfCars workers, removed vehicles from $nRemoved of them"
-            )
-            currentNumberOfCars = currentNumberOfCars - 1
-          }
+            }
         } else {
           val numberOfWorkVehiclesToCreate =
             min(numberOfWorkers - numberOfWorkersWithVehicles, goalCarTotal - totalCars)
