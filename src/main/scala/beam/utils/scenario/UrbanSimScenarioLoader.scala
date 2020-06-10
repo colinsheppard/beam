@@ -388,6 +388,7 @@ class UrbanSimScenarioLoader(
       .groupBy { case (householdId, _) => householdId }
 
     var currentTotalCars = totalCars
+
     var currentNumberOfCars = numberOfCars2HouseholdIds.keys.max
     while ((currentTotalCars > (goalCarTotal + numberOfWorkVehiclesToBeRemoved)) & currentNumberOfCars > 0) {
       val numberOfHouseholdsWithThisManyVehicles = numberOfCars2HouseholdIds(currentNumberOfCars).size
