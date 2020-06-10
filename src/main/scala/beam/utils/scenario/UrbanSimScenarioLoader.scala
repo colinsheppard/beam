@@ -271,120 +271,23 @@ class UrbanSimScenarioLoader(
 
         val goalCarTotal = round(fractionOfInitialVehicleFleet * totalCars).toInt
         if (fractionOfInitialVehicleFleet < 1.0) {
-          val numberOfWorkVehiclesToBeRemoved = max(numberOfWorkersWithVehicles - goalCarTotal, 0)
-          val numberOfExcessVehiclesToBeRemoved = totalCars - goalCarTotal - numberOfWorkVehiclesToBeRemoved
-          val personsToGetCarsRemoved = households
-            .flatMap { household =>
-              householdIdToPersons(household.householdId)
-                .map(p => p.personId -> personId2Score(p.personId))
-                .toSeq
-                .sortBy(_._2)
-                .takeRight(household.cars) // for each household, assign vehicles to the people with the highest commute distances
-            }
-            .toSeq
-            .sortBy(_._2) // sort all people with assigned cars by commute distance
-            .map(_._1)
-            .take(numberOfWorkVehiclesToBeRemoved) // Take the people with shortest commutes and remove their cars
-            .toSet
-          logger.info(
-            s"Identified $numberOfWorkVehiclesToBeRemoved household vehicles with short commutes and $numberOfExcessVehiclesToBeRemoved excess vehicles to be removed"
+          downsampleCars(
+            numberOfWorkersWithVehicles,
+            goalCarTotal,
+            totalCars,
+            households,
+            householdIdToPersons,
+            personId2Score,
+            numberOfCars2HouseholdIds
           )
-          val householdIdToPersonToHaveVehicleRemoved = householdIdToPersons
-            .map { case (householdId, persons) => persons.map(person => householdId -> person) }
-            .flatten
-            .filter { case (_, personId) => personsToGetCarsRemoved.contains(personId.personId) }
-            .groupBy { case (householdId, _) => householdId }
-
-          var currentTotalCars = totalCars
-          var currentNumberOfCars = numberOfCars2HouseholdIds.keys.max
-          while ((currentTotalCars > (goalCarTotal + numberOfWorkVehiclesToBeRemoved)) & currentNumberOfCars > 0) {
-            val numberOfHouseholdsWithThisManyVehicles = numberOfCars2HouseholdIds(currentNumberOfCars).size
-
-            val (householdsWithExcessVehicles, householdsWithCorrectNumberOfVehicles) =
-              numberOfCars2HouseholdIds(currentNumberOfCars).partition(
-                x => currentNumberOfCars > householdIdToPersons(x.householdId).size
-              )
-            val numberOfExcessVehicles = householdsWithExcessVehicles.size
-            logger.info(
-              s"Identified $numberOfExcessVehicles excess vehicles from the $numberOfHouseholdsWithThisManyVehicles households with $currentNumberOfCars vehicles"
-            )
-            if (currentTotalCars - numberOfExcessVehicles > goalCarTotal) {
-              logger.info(
-                s"Removing all $numberOfExcessVehicles excess vehicles"
-              )
-              currentTotalCars -= numberOfExcessVehicles
-              numberOfCars2HouseholdIds.getOrElseUpdate(currentNumberOfCars - 1, ArrayBuffer()) ++= householdsWithExcessVehicles
-              numberOfCars2HouseholdIds(currentNumberOfCars) = householdsWithCorrectNumberOfVehicles
-            } else {
-              val householdsInGroup = householdsWithExcessVehicles.size
-              val numberToRemain = householdsInGroup - (currentTotalCars - goalCarTotal)
-              logger.info(
-                s"Removing all but $numberToRemain of the $numberOfExcessVehicles excess vehicles"
-              )
-              val shuffled = rand.shuffle(householdsWithExcessVehicles)
-              numberOfCars2HouseholdIds(currentNumberOfCars) = shuffled.take(numberToRemain) ++ householdsWithCorrectNumberOfVehicles
-              numberOfCars2HouseholdIds.getOrElseUpdate(currentNumberOfCars - 1, ArrayBuffer()) ++= shuffled.takeRight(
-                householdsInGroup - numberToRemain
-              )
-              currentTotalCars -= (householdsInGroup - numberToRemain)
-            }
-            currentNumberOfCars = currentNumberOfCars - 1
-          }
-          logger.info(
-            s"Currently $currentTotalCars are left, $numberOfWorkVehiclesToBeRemoved work vehicles are yet to be removed"
-          )
-
-          numberOfCars2HouseholdIds.keys.toStream
-            .sorted(Ordering[Int].reverse)
-            .takeWhile(currentNumberOfCars => currentNumberOfCars > 0 && currentTotalCars > goalCarTotal)
-            .filter(numberOfCars2HouseholdIds.contains)
-            .foreach { currentNumberOfCars =>
-              val initialNumberOfHouseholds = numberOfCars2HouseholdIds(currentNumberOfCars).size
-              if (initialNumberOfHouseholds != 0) {
-                val newHouseHolds = new mutable.ArrayBuffer[HouseholdInfo]()
-
-                numberOfCars2HouseholdIds(currentNumberOfCars).foreach { hh =>
-                  val personIdsToRemove = householdIdToPersonToHaveVehicleRemoved.getOrElse(hh.householdId, Nil)
-                  val carsToRemove = min(personIdsToRemove.size, currentTotalCars - goalCarTotal)
-                  if (carsToRemove > 0) {
-                    numberOfCars2HouseholdIds.getOrElseUpdate(currentNumberOfCars - carsToRemove, ArrayBuffer()) += hh
-                    currentTotalCars -= carsToRemove
-                  } else {
-                    newHouseHolds += hh
-                  }
-
-                  numberOfCars2HouseholdIds(currentNumberOfCars) = newHouseHolds
-                }
-
-                val nRemoved = initialNumberOfHouseholds - newHouseHolds.size
-                logger.info(
-                  s"Originally had $initialNumberOfHouseholds work vehicles from households with $currentNumberOfCars workers, removed vehicles from $nRemoved of them"
-                )
-              }
-            }
         } else {
-          val numberOfWorkVehiclesToCreate =
-            min(numberOfWorkers - numberOfWorkersWithVehicles, goalCarTotal - totalCars)
-          val likelihoodToCreateVehicle = numberOfWorkVehiclesToCreate.toDouble / (numberOfWorkers - numberOfWorkersWithVehicles).toDouble
-          var currentTotalCars = totalCars
-          numberOfCars2HouseholdIds.keys.toSeq.sorted(Ordering[Int].reverse).foreach { numberOfCars =>
-            val newHouseHolds = new mutable.ArrayBuffer[HouseholdInfo]()
-
-            numberOfCars2HouseholdIds(numberOfCars).foreach { hh =>
-              val nWorkers = householdIdToPersons(hh.householdId).size
-              val numToCreate = drawFromBinomial(nWorkers - numberOfCars, likelihoodToCreateVehicle)
-              if (nWorkers <= numberOfCars || numToCreate == 0) {
-                newHouseHolds += hh
-              } else {
-                numberOfCars2HouseholdIds.getOrElseUpdate(numberOfCars + numToCreate, ArrayBuffer()) += hh
-                currentTotalCars += numToCreate
-              }
-            }
-
-            numberOfCars2HouseholdIds(numberOfCars) = newHouseHolds
-          }
-          logger.info(
-            s"Originally had $numberOfWorkersWithVehicles work vehicles and now have $currentTotalCars of them, with a goal of making $numberOfWorkVehiclesToCreate"
+          upsampleCars(
+            numberOfWorkers,
+            numberOfWorkersWithVehicles,
+            numberOfCars2HouseholdIds,
+            totalCars,
+            goalCarTotal,
+            householdIdToPersons
           )
         }
 
@@ -407,12 +310,149 @@ class UrbanSimScenarioLoader(
     }
   }
 
+  private def upsampleCars(
+    numberOfWorkers: Int,
+    numberOfWorkersWithVehicles: Int,
+    numberOfCars2HouseholdIds: mutable.Map[Int, ArrayBuffer[HouseholdInfo]],
+    totalCars: Int,
+    goalCarTotal: Int,
+    householdIdToPersons: Map[HouseholdId, Iterable[PersonInfo]]
+  ): mutable.Map[Int, ArrayBuffer[HouseholdInfo]] = {
+    val numberOfWorkVehiclesToCreate =
+      min(numberOfWorkers - numberOfWorkersWithVehicles, goalCarTotal - totalCars)
+    val likelihoodToCreateVehicle = numberOfWorkVehiclesToCreate.toDouble / (numberOfWorkers - numberOfWorkersWithVehicles).toDouble
+    var currentTotalCars = totalCars
+    numberOfCars2HouseholdIds.keys.toSeq.sorted(Ordering[Int].reverse).foreach { numberOfCars =>
+      val newHouseHolds = new mutable.ArrayBuffer[HouseholdInfo]()
+
+      numberOfCars2HouseholdIds(numberOfCars).foreach { hh =>
+        val nWorkers = householdIdToPersons(hh.householdId).size
+        val numToCreate = drawFromBinomial(nWorkers - numberOfCars, likelihoodToCreateVehicle)
+        if (nWorkers <= numberOfCars || numToCreate == 0) {
+          newHouseHolds += hh
+        } else {
+          numberOfCars2HouseholdIds.getOrElseUpdate(numberOfCars + numToCreate, ArrayBuffer()) += hh
+          currentTotalCars += numToCreate
+        }
+      }
+
+      numberOfCars2HouseholdIds(numberOfCars) = newHouseHolds
+    }
+    logger.info(
+      s"Originally had $numberOfWorkersWithVehicles work vehicles and now have $currentTotalCars of them, with a goal of making $numberOfWorkVehiclesToCreate"
+    )
+    numberOfCars2HouseholdIds
+  }
+
   private def drawFromBinomial(nTrials: Int, p: Double): Int = {
     var res = 0
     for (_ <- 0 until nTrials) {
       if (rand.nextDouble() < p) res += 1
     }
     res
+  }
+
+  private def downsampleCars(
+    numberOfWorkersWithVehicles: Int,
+    goalCarTotal: Int,
+    totalCars: Int,
+    households: Iterable[HouseholdInfo],
+    householdIdToPersons: Map[HouseholdId, Iterable[PersonInfo]],
+    personId2Score: Map[PersonId, Double],
+    numberOfCars2HouseholdIds: mutable.Map[Int, mutable.ArrayBuffer[HouseholdInfo]]
+  ): mutable.Map[Int, ArrayBuffer[HouseholdInfo]] = {
+    val numberOfWorkVehiclesToBeRemoved = max(numberOfWorkersWithVehicles - goalCarTotal, 0)
+    val numberOfExcessVehiclesToBeRemoved = totalCars - goalCarTotal - numberOfWorkVehiclesToBeRemoved
+    val personsToGetCarsRemoved = households
+      .flatMap { household =>
+        householdIdToPersons(household.householdId)
+          .map(p => p.personId -> personId2Score(p.personId))
+          .toSeq
+          .sortBy(_._2)
+          .takeRight(household.cars) // for each household, assign vehicles to the people with the highest commute distances
+      }
+      .toSeq
+      .sortBy(_._2) // sort all people with assigned cars by commute distance
+      .map(_._1)
+      .take(numberOfWorkVehiclesToBeRemoved) // Take the people with shortest commutes and remove their cars
+      .toSet
+    logger.info(
+      s"Identified $numberOfWorkVehiclesToBeRemoved household vehicles with short commutes and $numberOfExcessVehiclesToBeRemoved excess vehicles to be removed"
+    )
+    val householdIdToPersonToHaveVehicleRemoved = householdIdToPersons
+      .map { case (householdId, persons) => persons.map(person => householdId -> person) }
+      .flatten
+      .filter { case (_, personId) => personsToGetCarsRemoved.contains(personId.personId) }
+      .groupBy { case (householdId, _) => householdId }
+
+    var currentTotalCars = totalCars
+    var currentNumberOfCars = numberOfCars2HouseholdIds.keys.max
+    while ((currentTotalCars > (goalCarTotal + numberOfWorkVehiclesToBeRemoved)) & currentNumberOfCars > 0) {
+      val numberOfHouseholdsWithThisManyVehicles = numberOfCars2HouseholdIds(currentNumberOfCars).size
+
+      val (householdsWithExcessVehicles, householdsWithCorrectNumberOfVehicles) =
+        numberOfCars2HouseholdIds(currentNumberOfCars).partition(
+          x => currentNumberOfCars > householdIdToPersons(x.householdId).size
+        )
+      val numberOfExcessVehicles = householdsWithExcessVehicles.size
+      logger.info(
+        s"Identified $numberOfExcessVehicles excess vehicles from the $numberOfHouseholdsWithThisManyVehicles households with $currentNumberOfCars vehicles"
+      )
+      if (currentTotalCars - numberOfExcessVehicles > goalCarTotal) {
+        logger.info(
+          s"Removing all $numberOfExcessVehicles excess vehicles"
+        )
+        currentTotalCars -= numberOfExcessVehicles
+        numberOfCars2HouseholdIds.getOrElseUpdate(currentNumberOfCars - 1, ArrayBuffer()) ++= householdsWithExcessVehicles
+        numberOfCars2HouseholdIds(currentNumberOfCars) = householdsWithCorrectNumberOfVehicles
+      } else {
+        val householdsInGroup = householdsWithExcessVehicles.size
+        val numberToRemain = householdsInGroup - (currentTotalCars - goalCarTotal)
+        logger.info(
+          s"Removing all but $numberToRemain of the $numberOfExcessVehicles excess vehicles"
+        )
+        val shuffled = rand.shuffle(householdsWithExcessVehicles)
+        numberOfCars2HouseholdIds(currentNumberOfCars) = shuffled.take(numberToRemain) ++ householdsWithCorrectNumberOfVehicles
+        numberOfCars2HouseholdIds.getOrElseUpdate(currentNumberOfCars - 1, ArrayBuffer()) ++= shuffled.takeRight(
+          householdsInGroup - numberToRemain
+        )
+        currentTotalCars -= (householdsInGroup - numberToRemain)
+      }
+      currentNumberOfCars = currentNumberOfCars - 1
+    }
+    logger.info(
+      s"Currently $currentTotalCars are left, $numberOfWorkVehiclesToBeRemoved work vehicles are yet to be removed"
+    )
+
+    numberOfCars2HouseholdIds.keys.toStream
+      .sorted(Ordering[Int].reverse)
+      .takeWhile(currentNumberOfCars => currentNumberOfCars > 0 && currentTotalCars > goalCarTotal)
+      .filter(numberOfCars2HouseholdIds.contains)
+      .foreach { currentNumberOfCars =>
+        val initialNumberOfHouseholds = numberOfCars2HouseholdIds(currentNumberOfCars).size
+        if (initialNumberOfHouseholds != 0) {
+          val newHouseHolds = new mutable.ArrayBuffer[HouseholdInfo]()
+
+          numberOfCars2HouseholdIds(currentNumberOfCars).foreach { hh =>
+            val personIdsToRemove = householdIdToPersonToHaveVehicleRemoved.getOrElse(hh.householdId, Nil)
+            val carsToRemove = min(personIdsToRemove.size, currentTotalCars - goalCarTotal)
+            if (carsToRemove > 0) {
+              numberOfCars2HouseholdIds.getOrElseUpdate(currentNumberOfCars - carsToRemove, ArrayBuffer()) += hh
+              currentTotalCars -= carsToRemove
+            } else {
+              newHouseHolds += hh
+            }
+
+            numberOfCars2HouseholdIds(currentNumberOfCars) = newHouseHolds
+          }
+
+          val nRemoved = initialNumberOfHouseholds - newHouseHolds.size
+          logger.info(
+            s"Originally had $initialNumberOfHouseholds work vehicles from households with $currentNumberOfCars workers, removed vehicles from $nRemoved of them"
+          )
+        }
+      }
+    numberOfCars2HouseholdIds
   }
 
   private[utils] def applyPersons(persons: Iterable[PersonInfo]): Unit = {
