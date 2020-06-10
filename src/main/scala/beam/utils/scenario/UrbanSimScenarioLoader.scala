@@ -265,33 +265,30 @@ class UrbanSimScenarioLoader(
         val numberOfWorkersWithVehicles =
           households.map(x => min(x.cars, householdIdToPersons(x.householdId).size)).sum
 
-        val numberOfCars2HouseholdIds =
-          mutable.Map(ArrayBuffer(households.toSeq: _*).groupBy(_.cars).toSeq: _*)
         val totalCars = households.map(_.cars).sum
 
         val goalCarTotal = round(fractionOfInitialVehicleFleet * totalCars).toInt
-        if (fractionOfInitialVehicleFleet < 1.0) {
+        val resultNumberOfCars2HouseHoldIds = if (fractionOfInitialVehicleFleet < 1.0) {
           downsampleCars(
-            numberOfWorkersWithVehicles,
-            goalCarTotal,
-            totalCars,
-            households,
-            householdIdToPersons,
-            personId2Score,
-            numberOfCars2HouseholdIds
+            numberOfWorkersWithVehicles = numberOfWorkersWithVehicles,
+            goalCarTotal = goalCarTotal,
+            households = households,
+            householdIdToPersons = householdIdToPersons,
+            totalCars = totalCars,
+            personId2Score = personId2Score,
           )
         } else {
           upsampleCars(
-            numberOfWorkers,
-            numberOfWorkersWithVehicles,
-            numberOfCars2HouseholdIds,
-            totalCars,
-            goalCarTotal,
-            householdIdToPersons
+            numberOfWorkersWithVehicles = numberOfWorkersWithVehicles,
+            goalCarTotal = goalCarTotal,
+            households = households,
+            householdIdToPersons = householdIdToPersons,
+            totalCars = totalCars,
+            numberOfWorkers = numberOfWorkers
           )
         }
 
-        val result = numberOfCars2HouseholdIds.flatMap {
+        val result = resultNumberOfCars2HouseHoldIds.flatMap {
           case (nVehicles, householdIds) =>
             householdIds.map(_ -> nVehicles)
         }
@@ -311,13 +308,16 @@ class UrbanSimScenarioLoader(
   }
 
   private def upsampleCars(
-    numberOfWorkers: Int,
     numberOfWorkersWithVehicles: Int,
-    numberOfCars2HouseholdIds: mutable.Map[Int, ArrayBuffer[HouseholdInfo]],
-    totalCars: Int,
     goalCarTotal: Int,
-    householdIdToPersons: Map[HouseholdId, Iterable[PersonInfo]]
+    households: Iterable[HouseholdInfo],
+    householdIdToPersons: Map[HouseholdId, Iterable[PersonInfo]],
+    totalCars: Int,
+    numberOfWorkers: Int,
   ): mutable.Map[Int, ArrayBuffer[HouseholdInfo]] = {
+    val numberOfCars2HouseholdIds =
+      mutable.Map(ArrayBuffer(households.toSeq: _*).groupBy(_.cars).toSeq: _*)
+
     val numberOfWorkVehiclesToCreate =
       min(numberOfWorkers - numberOfWorkersWithVehicles, goalCarTotal - totalCars)
     val likelihoodToCreateVehicle = numberOfWorkVehiclesToCreate.toDouble / (numberOfWorkers - numberOfWorkersWithVehicles).toDouble
@@ -355,12 +355,14 @@ class UrbanSimScenarioLoader(
   private def downsampleCars(
     numberOfWorkersWithVehicles: Int,
     goalCarTotal: Int,
-    totalCars: Int,
     households: Iterable[HouseholdInfo],
     householdIdToPersons: Map[HouseholdId, Iterable[PersonInfo]],
-    personId2Score: Map[PersonId, Double],
-    numberOfCars2HouseholdIds: mutable.Map[Int, mutable.ArrayBuffer[HouseholdInfo]]
+    totalCars: Int,
+    personId2Score: Map[PersonId, Double]
   ): mutable.Map[Int, ArrayBuffer[HouseholdInfo]] = {
+    val numberOfCars2HouseholdIds =
+      mutable.Map(ArrayBuffer(households.toSeq: _*).groupBy(_.cars).toSeq: _*)
+
     val numberOfWorkVehiclesToBeRemoved = max(numberOfWorkersWithVehicles - goalCarTotal, 0)
     val numberOfExcessVehiclesToBeRemoved = totalCars - goalCarTotal - numberOfWorkVehiclesToBeRemoved
     val personsToGetCarsRemoved = households
