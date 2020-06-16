@@ -1,5 +1,6 @@
 package beam.utils.traveltime
 
+import java.io.File
 import java.util
 
 import org.matsim.api.core.v01.Id
@@ -15,16 +16,30 @@ object NetworkFeaturesExtractor {
     val pathToNetworkXml = args(1)
     val level = args(2).toInt
     val outputFile = args(3)
-    val delimiter = args(4)
+    val enteredLinkMultiThreaded = if (args.length > 4) args(4) == "true" else false
+    val leavedLinkMultiThreaded = if (args.length > 5) args(5) == "true" else false
+    val shouldWriteMapping = if (args.length > 6) args(6) == "true" else false
 
     val networkLinks = initializeNetworkLinks(pathToNetworkXml)
     val eventsManager = EventsUtils.createEventsManager()
-    val featureExtractor = new LinkInOutFeature(networkLinks, level, outputFile, delimiter)
-    val eventHander = new FeatureEventHandler(networkLinks, delimiter, outputFile, featureExtractor)
-    eventsManager.addHandler(eventHander)
-    new MatsimEventsReader(eventsManager).readFile(pathToEventXml)
+    val writerType = WriterType.Parquet
 
-    eventHander.close()
+    val featureExtractor = new LinkInOutFeature(
+      links = networkLinks,
+      level = level,
+      pathToMetadataFolder = new File(outputFile).getParentFile.toString,
+      enteredLinkMultiThreaded = enteredLinkMultiThreaded,
+      leavedLinkMultiThreaded = leavedLinkMultiThreaded,
+      shouldWriteMapping = shouldWriteMapping
+    )
+    val eventHandler = new FeatureEventHandler(networkLinks, Set(writerType), outputFile, featureExtractor)
+
+    try {
+      eventsManager.addHandler(eventHandler)
+      new MatsimEventsReader(eventsManager).readFile(pathToEventXml)
+    } finally {
+      eventHandler.close()
+    }
   }
 
   def initializeNetworkLinks(networkXml: String): util.Map[Id[Link], _ <: Link] = {
