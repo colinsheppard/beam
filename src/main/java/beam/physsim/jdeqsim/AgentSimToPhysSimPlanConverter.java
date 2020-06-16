@@ -14,6 +14,7 @@ import beam.physsim.cchRoutingAssignment.RoutingFrameworkTravelTimeCalculator;
 import beam.physsim.cchRoutingAssignment.RoutingFrameworkWrapperImpl;
 import beam.router.BeamRouter;
 import beam.router.FreeFlowTravelTime;
+import beam.router.skim.PeakSkimCreator;
 import beam.sim.BeamConfigChangesObservable;
 import beam.sim.BeamConfigChangesObserver;
 import beam.sim.BeamServices;
@@ -255,6 +256,12 @@ public class AgentSimToPhysSimPlanConverter implements BasicEventHandler, Metric
         //################################################################################################################
         router.tell(new BeamRouter.UpdateTravelTimeLocal(travelTimeForR5), ActorRef.noSender());
 
+        if (shouldWriteInIteration(iterationNumber, beamConfig.beam().urbansim().allTAZSkimsWriteInterval())) {
+            writeTravelTimeMap(iterationNumber, travelTimeMap);
+            PeakSkimCreator psc = new PeakSkimCreator(beamServices, beamConfig, beamServices.beamRouter());
+            psc.write(iterationNumber);
+        }
+
         completableFutures.add(CompletableFuture.runAsync(() -> linkSpeedStatsGraph.notifyIterationEnds(iterationNumber, travelTimeFromPhysSim)));
 
         completableFutures.add(CompletableFuture.runAsync(() -> linkSpeedDistributionStatsGraph.notifyIterationEnds(iterationNumber, travelTimeFromPhysSim)));
@@ -281,12 +288,24 @@ public class AgentSimToPhysSimPlanConverter implements BasicEventHandler, Metric
         traversalEventsForPhysSimulation.clear();
     }
 
+    private void writeTravelTimeMap(int iteration, Map<String, double[]> map) {
+        String filePath = controlerIO.getIterationFilename(iteration, "travelTime.bin");
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeObject(map);
+            oos.flush();
+            oos.close();
+        } catch (Exception ex) {
+            log.error("Can't write travel time map", ex);
+        }
+    }
+
     private boolean shouldWritePlans(int iterationNumber) {
         return shouldWriteInIteration(iterationNumber, beamConfig.beam().physsim().writePlansInterval());
     }
 
     private boolean shouldWriteInIteration(int iterationNumber, int interval) {
-        return interval == 1 || (interval > 0 && iterationNumber % interval == 0);
+        return interval == 1 || (interval > 0 && iterationNumber != 0 && iterationNumber % interval == 0);
     }
 
     private void writePhyssimPlans(IterationEndsEvent event) {

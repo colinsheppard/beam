@@ -120,8 +120,8 @@ case class ODSkims(beamServices: BeamServices) extends AbstractSkimmerReadOnly {
     vehicleTypeId: Id[BeamVehicleType],
     beamScenario: BeamScenario
   ): Skim = {
-    val origTaz = beamScenario.tazTreeMap.getTAZ(originUTM.getX, originUTM.getY).tazId
-    val destTaz = beamScenario.tazTreeMap.getTAZ(destinationUTM.getX, destinationUTM.getY).tazId
+    val origTaz = beamServices.beamScenario.tazTreeMap.getTAZ(originUTM.getX, originUTM.getY).tazId
+    val destTaz = beamServices.beamScenario.tazTreeMap.getTAZ(destinationUTM.getX, destinationUTM.getY).tazId
     getSkimValue(departureTime, mode, origTaz, destTaz) match {
       case Some(skimValue) =>
         skimValue.toSkimExternal
@@ -148,7 +148,7 @@ case class ODSkims(beamServices: BeamServices) extends AbstractSkimmerReadOnly {
   ): ExcerptData = {
     val individualSkims = hoursIncluded.map { timeBin =>
       skim
-        .get(ODSkimmerKey(timeBin, mode, origin.tazId, destination.tazId))
+        .get(ODSkimmerKey(timeBin, mode, origin.tazId.toString, destination.tazId.toString))
         .map(_.toSkimExternal)
         .getOrElse {
           val adjustedDestCoord = if (origin.equals(destination)) {
@@ -203,9 +203,9 @@ case class ODSkims(beamServices: BeamServices) extends AbstractSkimmerReadOnly {
 
   private def getSkimValue(time: Int, mode: BeamMode, orig: Id[TAZ], dest: Id[TAZ]): Option[ODSkimmerInternal] = {
     pastSkims
-      .map(_.get(ODSkimmerKey(timeToBin(time), mode, orig, dest)))
+      .map(_.get(ODSkimmerKey(timeToBin(time), mode, orig.toString, dest.toString)))
       .headOption
-      .getOrElse(aggregatedSkim.get(ODSkimmerKey(timeToBin(time), mode, orig, dest)))
+      .getOrElse(aggregatedSkim.get(ODSkimmerKey(timeToBin(time), mode, orig.toString, dest.toString)))
       .map(_.asInstanceOf[ODSkimmerInternal])
   }
 

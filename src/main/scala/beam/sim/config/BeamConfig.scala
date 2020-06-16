@@ -26,6 +26,7 @@ object BeamConfig {
     routing: BeamConfig.Beam.Routing,
     sim: BeamConfig.Beam.Sim,
     spatial: BeamConfig.Beam.Spatial,
+    urbansim: BeamConfig.Beam.Urbansim,
     useLocalWorker: scala.Boolean,
     warmStart: BeamConfig.Beam.WarmStart
   )
@@ -1625,7 +1626,8 @@ object BeamConfig {
       meanToCountsWeightRatio: scala.Double,
       mode: BeamConfig.Beam.Calibration.Mode,
       objectiveFunction: java.lang.String,
-      roadNetwork: BeamConfig.Beam.Calibration.RoadNetwork
+      roadNetwork: BeamConfig.Beam.Calibration.RoadNetwork,
+      studyArea: BeamConfig.Beam.Calibration.StudyArea
     )
 
     object Calibration {
@@ -1696,6 +1698,25 @@ object BeamConfig {
         }
       }
 
+      case class StudyArea(
+        enabled: scala.Boolean,
+        lat: scala.Double,
+        lon: scala.Double,
+        radius: scala.Double
+      )
+
+      object StudyArea {
+
+        def apply(c: com.typesafe.config.Config): BeamConfig.Beam.Calibration.StudyArea = {
+          BeamConfig.Beam.Calibration.StudyArea(
+            enabled = c.hasPathOrNull("enabled") && c.getBoolean("enabled"),
+            lat = if (c.hasPathOrNull("lat")) c.getDouble("lat") else 0,
+            lon = if (c.hasPathOrNull("lon")) c.getDouble("lon") else 0,
+            radius = if (c.hasPathOrNull("radius")) c.getDouble("radius") else 0
+          )
+        }
+      }
+
       def apply(c: com.typesafe.config.Config): BeamConfig.Beam.Calibration = {
         BeamConfig.Beam.Calibration(
           counts = BeamConfig.Beam.Calibration.Counts(
@@ -1714,6 +1735,10 @@ object BeamConfig {
           roadNetwork = BeamConfig.Beam.Calibration.RoadNetwork(
             if (c.hasPathOrNull("roadNetwork")) c.getConfig("roadNetwork")
             else com.typesafe.config.ConfigFactory.parseString("roadNetwork{}")
+          ),
+          studyArea = BeamConfig.Beam.Calibration.StudyArea(
+            if (c.hasPathOrNull("studyArea")) c.getConfig("studyArea")
+            else com.typesafe.config.ConfigFactory.parseString("studyArea{}")
           )
         )
       }
@@ -3183,6 +3208,22 @@ object BeamConfig {
       }
     }
 
+    case class Urbansim(
+      allTAZSkimsPeakHour: scala.Double,
+      allTAZSkimsWriteInterval: scala.Int
+    )
+
+    object Urbansim {
+
+      def apply(c: com.typesafe.config.Config): BeamConfig.Beam.Urbansim = {
+        BeamConfig.Beam.Urbansim(
+          allTAZSkimsPeakHour = if (c.hasPathOrNull("allTAZSkimsPeakHour")) c.getDouble("allTAZSkimsPeakHour") else 8.5,
+          allTAZSkimsWriteInterval =
+            if (c.hasPathOrNull("allTAZSkimsWriteInterval")) c.getInt("allTAZSkimsWriteInterval") else 0
+        )
+      }
+    }
+
     case class WarmStart(
       enabled: scala.Boolean,
       path: java.lang.String,
@@ -3279,6 +3320,10 @@ object BeamConfig {
         spatial = BeamConfig.Beam.Spatial(
           if (c.hasPathOrNull("spatial")) c.getConfig("spatial")
           else com.typesafe.config.ConfigFactory.parseString("spatial{}")
+        ),
+        urbansim = BeamConfig.Beam.Urbansim(
+          if (c.hasPathOrNull("urbansim")) c.getConfig("urbansim")
+          else com.typesafe.config.ConfigFactory.parseString("urbansim{}")
         ),
         useLocalWorker = !c.hasPathOrNull("useLocalWorker") || c.getBoolean("useLocalWorker"),
         warmStart = BeamConfig.Beam.WarmStart(

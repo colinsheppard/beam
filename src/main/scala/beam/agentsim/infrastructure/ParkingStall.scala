@@ -20,6 +20,7 @@ case class ParkingStall(
 
 object ParkingStall {
 
+  // FIXME
   val CostOfEmergencyStallInDollars: Double = 50.0
 
   /**
