@@ -17,6 +17,9 @@ import org.matsim.api.core.v01.population.{Activity, Person}
 import org.matsim.api.core.v01.{Coord, Id, Scenario}
 import org.matsim.core.api.experimental.events.EventsManager
 import org.matsim.households.Household
+import org.matsim.utils.objectattributes.ObjectAttributes
+import beam.utils.scenario
+import beam.utils.scenario.ObjectAttributesScala
 
 import scala.collection.JavaConverters
 
@@ -71,26 +74,22 @@ class Population(
   private def initHouseholds(iterId: Option[String] = None): Unit = {
     scenario.getHouseholds.getHouseholds.values().forEach { household =>
       //TODO a good example where projection should accompany the data
-      if (scenario.getHouseholds.getHouseholdAttributes
-            .getAttribute(household.getId.toString, "homecoordx") == null) {
-        log.error(
-          s"Cannot find homeCoordX for household ${household.getId} which will be interpreted at 0.0"
+
+      val houseHoldAttributes: ObjectAttributesScala = scenario.getHouseholds.getHouseholdAttributes
+
+      val homeCoord = {
+        val householdId = household.getId.toString
+        new Coord(
+          houseHoldAttributes.getAttribute(householdId, "homecoordx", {
+            log.error(s"Cannot find homecoordx for object $householdId which will be interpreted as 0.0")
+            0d
+          }),
+          houseHoldAttributes.getAttribute(householdId, "homecoordy", {
+            log.error(s"Cannot find homecoordy for object $householdId which will be interpreted as 0.0")
+            0d
+          })
         )
       }
-      if (scenario.getHouseholds.getHouseholdAttributes
-            .getAttribute(household.getId.toString.toLowerCase(), "homecoordy") == null) {
-        log.error(
-          s"Cannot find homeCoordY for household ${household.getId} which will be interpreted at 0.0"
-        )
-      }
-      val homeCoord = new Coord(
-        scenario.getHouseholds.getHouseholdAttributes
-          .getAttribute(household.getId.toString, "homecoordx")
-          .asInstanceOf[Double],
-        scenario.getHouseholds.getHouseholdAttributes
-          .getAttribute(household.getId.toString, "homecoordy")
-          .asInstanceOf[Double]
-      )
 
       val householdVehicles: Map[Id[BeamVehicle], BeamVehicle] = JavaConverters
         .collectionAsScalaIterable(household.getVehicleIds)
