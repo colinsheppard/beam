@@ -1,23 +1,33 @@
 package beam.router
 
+import java.io.Closeable
+import java.nio.file.Path
+
 import beam.agentsim.agents.vehicles.BeamVehicleType
 import beam.agentsim.agents.vehicles.VehicleProtocol.StreetVehicle
 import beam.agentsim.events.SpaceTime
+import beam.agentsim.infrastructure.geozone.GeoZoneUtil.toWgsCoordinate
+import beam.agentsim.infrastructure.geozone.WgsCoordinate
 import beam.router.BeamRouter.{Location, RoutingRequest}
 import beam.router.Modes.BeamMode
 import beam.router.r5.{R5Parameters, R5Wrapper}
 import beam.sim.BeamHelper
+import beam.sim.common.GeoUtils
 import beam.sim.population.{AttributesOfIndividual, HouseholdAttributes}
+import beam.utils.csv.{CsvWriter, GenericCsvReader}
 import com.typesafe.config.Config
-import org.matsim.api.core.v01.Id
+import org.matsim.api.core.v01.{Coord, Id}
 
 // You can run it as:
 //  - App with Main method in IntelliJ IDEA. You need to provide config as Program Arguments: `--config test/input/texas/austin-prod-100k.conf`
 //  - Run it from gradle: `./gradlew :execute -PmainClass=beam.router.R5Requester -PmaxRAM=4 -PappArgs="['--config', 'test/input/texas/austin-prod-100k.conf']"`
 object R5Requester extends BeamHelper {
 
-  private val baseRoutingRequest: RoutingRequest = {
-    val originUTM = new Location(2961475.272057291, 3623253.4635826824)
+  private val geo: GeoUtils = new GeoUtils {
+    override def localCRS: String = "epsg:2808"
+  }
+
+  def baseRoutingRequest(originUtm: Coord, destinationUtm: Coord): RoutingRequest = {
     val personAttribs = AttributesOfIndividual(
       householdAttributes = HouseholdAttributes("48-453-001845-2:117138", 70000.0, 1, 1, 1),
       modalityStyle = None,
@@ -27,9 +37,10 @@ object R5Requester extends BeamHelper {
       age = None,
       income = Some(70000.0)
     )
+
     RoutingRequest(
-      originUTM = originUTM,
-      destinationUTM = new Location(2967932.9521744307, 3635449.522501624),
+      originUTM = originUtm,
+      destinationUTM = destinationUtm,
       departureTime = 30600,
       withTransit = true,
       streetVehicles = Vector.empty,
@@ -37,50 +48,209 @@ object R5Requester extends BeamHelper {
     )
   }
 
+  object R5Request {
+
+    def readAsWGS(rec: java.util.Map[String, String]): R5Request = {
+      R5Request(
+        xFrom = rec.get("xFrom").toDouble,
+        xTo = rec.get("xTo").toDouble,
+        yFrom = rec.get("yFrom").toDouble,
+        yTo = rec.get("yTo").toDouble
+      )
+    }
+  }
+
+  case class R5Request(xFrom: Double, yFrom: Double, xTo: Double, yTo: Double) {
+    def originUtm(geo: GeoUtils): Coord = geo.wgs2Utm(new Coord(xFrom, yFrom))
+    def destinationUtm(geo: GeoUtils): Coord = geo.wgs2Utm(new Coord(xTo, yTo))
+  }
+
+  def readRequestsFromFile(relativePath: String): Set[R5Request] = {
+    val (iter: Iterator[R5Request], toClose: Closeable) =
+      GenericCsvReader.readAs[R5Request](relativePath, R5Request.readAsWGS, _ => true)
+    try {
+      iter.toSet
+    } finally {
+      toClose.close()
+    }
+
+  }
+
+  case class RouteRequestResults(
+    mode: String,
+    number: Int,
+    durationSeconds: Double,
+    distance: Double,
+    responce: BeamRouter.RoutingResponse
+  ) {
+
+    def printlns(): Unit = {
+      println(s"######################## $mode ##############################")
+      println(s"Trip calculation took: $durationSeconds seconds")
+      println(s"Distance is: $distance")
+      println(s"Number of routes: ${responce.itineraries.length}")
+      responce.itineraries.zipWithIndex.foreach {
+        case (route, idx) =>
+          println(s"$idx\t$route")
+      }
+      println
+      println
+    }
+  }
+
+  def makeRequestToR5(
+    r5Wrapper: R5Wrapper,
+    originUtm: Coord,
+    destinationUtm: Coord,
+    number: Int
+  ): Seq[RouteRequestResults] = {
+    def makeRouteRequest(name: String, request: BeamRouter.RoutingRequest, distance: Double): RouteRequestResults = {
+      val startTimeMillis = System.currentTimeMillis()
+      val responce = r5Wrapper.calcRoute(request)
+      val endTimeMillis = System.currentTimeMillis()
+
+      val durationSeconds = (endTimeMillis - startTimeMillis) / 1000.0
+      RouteRequestResults(name, number, durationSeconds, distance, responce)
+    }
+
+    val carStreetVehicle =
+      getStreetVehicle("dummy-car-for-skim-observations", BeamMode.CAV, originUtm)
+    val bikeStreetVehicle =
+      getStreetVehicle("dummy-bike-for-skim-observations", BeamMode.BIKE, originUtm)
+    val walkStreetVehicle =
+      getStreetVehicle("dummy-body-for-skim-observations", BeamMode.WALK, originUtm)
+
+    val distance = geo.distUTMInMeters(originUtm, destinationUtm)
+
+    //    val threeModesReq: RoutingRequest = baseRoutingRequest(originUtm, destinationUtm).copy(
+    //      streetVehicles = Vector(carStreetVehicle, bikeStreetVehicle, walkStreetVehicle),
+    //      withTransit = true
+    //    )
+    //    makeRouteRequest("Three Modes in one shot", threeModesReq)
+
+    val carReq = baseRoutingRequest(originUtm, destinationUtm)
+      .copy(streetVehicles = Vector(carStreetVehicle), withTransit = false)
+    val car = makeRouteRequest("car", carReq, distance)
+
+    val bikeReq = baseRoutingRequest(originUtm, destinationUtm)
+      .copy(streetVehicles = Vector(bikeStreetVehicle), withTransit = false)
+    val bike = makeRouteRequest("bike", bikeReq, distance)
+
+    val walkTransitReq = baseRoutingRequest(originUtm, destinationUtm)
+      .copy(streetVehicles = Vector(walkStreetVehicle), withTransit = true)
+    val walkTransit = makeRouteRequest("walktransit", walkTransitReq, distance)
+
+    val walkReq = baseRoutingRequest(originUtm, destinationUtm)
+      .copy(streetVehicles = Vector(walkStreetVehicle), withTransit = false)
+    val walk = makeRouteRequest("walk", walkReq, distance)
+
+    Seq(car, bike, walkTransit, walk)
+  }
+
   def main(args: Array[String]): Unit = {
-    val (_, cfg) = prepareConfig(args, isConfigArgRequired = true)
+    val (_, cfg) = prepareConfig(args.take(2), isConfigArgRequired = true)
+
+    val requestsPath = {
+      if (args.length > 2) args(2)
+      else "/home/nikolay/.jupyter-files/routes.detroit.2k.csv"
+    }
+    val responsesPath = {
+      if (args.length > 3) args(3)
+      else "/home/nikolay/.jupyter-files/routes.detroit.2k.original.responses.csv"
+    }
+
+    println(s"configuration: ${args(1)}")
+    println(s"requests path: $requestsPath")
+    println(s"responses path: $responsesPath")
+
+    val requests = readRequestsFromFile(requestsPath)
 
     val r5Wrapper = createR5Wrapper(cfg)
 
-    val carStreetVehicle =
-      getStreetVehicle("dummy-car-for-skim-observations", BeamMode.CAV, baseRoutingRequest.originUTM)
-    val bikeStreetVehicle =
-      getStreetVehicle("dummy-bike-for-skim-observations", BeamMode.BIKE, baseRoutingRequest.originUTM)
-    val walkStreetVehicle =
-      getStreetVehicle("dummy-body-for-skim-observations", BeamMode.WALK, baseRoutingRequest.originUTM)
-
-    val threeModesReq = baseRoutingRequest.copy(
-      streetVehicles = Vector(carStreetVehicle, bikeStreetVehicle, walkStreetVehicle),
-      withTransit = true
+    val csvWriter = new CsvWriter(
+      responsesPath,
+      Vector(
+        "routeNumber",
+        "mode",
+        "durationSeconds",
+        "distance",
+        "numberOfRoutes",
+        "responseStr"
+      )
     )
-    val threeModesResp = r5Wrapper.calcRoute(threeModesReq)
-    showRouteResponse("Three Modes in one shot", threeModesResp)
-    println
 
-    val carReq = baseRoutingRequest.copy(streetVehicles = Vector(carStreetVehicle), withTransit = false)
-    val carResp = r5Wrapper.calcRoute(carReq)
-    showRouteResponse("Only CAR mode", carResp)
-    println
-
-    val bikeReq = baseRoutingRequest.copy(streetVehicles = Vector(bikeStreetVehicle), withTransit = false)
-    val bikeResp = r5Wrapper.calcRoute(bikeReq)
-    showRouteResponse("Only BIKE mode", bikeResp)
-    println
-
-    val walkReq = baseRoutingRequest.copy(streetVehicles = Vector(walkStreetVehicle), withTransit = true)
-    val walkResp = r5Wrapper.calcRoute(walkReq)
-    showRouteResponse("Only WALK mode with transit", walkResp)
-    println
-  }
-
-  private def showRouteResponse(name: String, threeModesResp: BeamRouter.RoutingResponse): Unit = {
-    println(s"######################## $name ##############################")
-    println(s"Number of routes: ${threeModesResp.itineraries.length}")
-    threeModesResp.itineraries.zipWithIndex.foreach {
-      case (route, idx) =>
-        println(s"$idx\t$route")
+    object ResultStats {
+      var numberOfSuccessRoutes = 0
+      var numberOfEmptyRoutes = 0
     }
-    println("######################################################" + new String(Array.fill(name.length + 2) { '#' }))
+
+    def processResult(result: RouteRequestResults): Unit = {
+      val respStr: String = result.responce.itineraries.zipWithIndex
+        .map {
+          case (route, idx) => s"$idx:$route"
+        }
+        .mkString
+        .replace(',', '.')
+
+      if (result.responce.itineraries.isEmpty) {
+        ResultStats.numberOfEmptyRoutes += 1
+      } else {
+        ResultStats.numberOfSuccessRoutes += 1
+      }
+
+      csvWriter.writeRow(
+        IndexedSeq(
+          result.number,
+          result.mode,
+          result.durationSeconds,
+          result.distance,
+          result.responce.itineraries.length,
+          "\"" + respStr + "\""
+        )
+      )
+    }
+
+    var number = 0
+    def getNumber: Int = {
+      number += 1
+      number
+    }
+
+    val divider = 33
+    val oneProgressPiece = requests.size / divider
+    var piecesDone = 0
+    var numberOfProcessedRequests = 0
+    var progressStartTimeMillis = System.currentTimeMillis()
+    var progressEndTimeMillis = System.currentTimeMillis()
+    def progress(): Unit = {
+      numberOfProcessedRequests += 1
+      if (numberOfProcessedRequests >= oneProgressPiece) {
+        progressEndTimeMillis = System.currentTimeMillis()
+        val progressStepSeconds = (progressEndTimeMillis - progressStartTimeMillis) / 1000.0
+        progressStartTimeMillis = progressEndTimeMillis
+        piecesDone += 1
+        numberOfProcessedRequests = 0
+        println(s"$piecesDone / $divider done. took $progressStepSeconds seconds")
+      }
+    }
+
+    println(s"there are ${requests.size} requests and 1/$divider is $oneProgressPiece")
+
+    val startTimeMillis = System.currentTimeMillis()
+    requests
+      .flatMap { request =>
+        progress()
+        makeRequestToR5(r5Wrapper, request.originUtm(geo), request.destinationUtm(geo), getNumber)
+      }
+      .foreach(processResult)
+    val endTimeMillis = System.currentTimeMillis()
+    val durationSeconds = (endTimeMillis - startTimeMillis) / 1000.0
+
+    csvWriter.close()
+    println(s"calculation took $durationSeconds seconds")
+    println(s"number of empty routes: ${ResultStats.numberOfEmptyRoutes}")
+    println(s"number of success routes: ${ResultStats.numberOfSuccessRoutes}")
+    println(s"results are written into $responsesPath")
   }
 
   private def createR5Wrapper(cfg: Config): R5Wrapper = {

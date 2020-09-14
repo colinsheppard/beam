@@ -97,9 +97,9 @@ class UrbanSimScenarioLoader(
       }
       householdsInsideBoundingBox
     }
-    val plans = Await.result(plansF, 500.seconds)
-    val persons = Await.result(personsF, 500.seconds)
-    val households = Await.result(householdsF, 500.seconds)
+    val plans = Await.result(plansF, 1000.seconds)
+    val persons = Await.result(personsF, 1000.seconds)
+    val households = Await.result(householdsF, 1000.seconds)
 
     val householdIds = households.map(_.householdId.id).toSet
 
@@ -571,7 +571,7 @@ class UrbanSimScenarioLoader(
           } else {
             new Coord(planInfo.activityLocationX.get, planInfo.activityLocationY.get)
           }
-          val activityType = planInfo.activityType.getOrElse(
+          val activityType = planInfo.activityType.map(_.toLowerCase).getOrElse(
             throw new IllegalStateException(
               s"planElement is `activity`, but `activityType` is None. planInfo: $planInfo"
             )
