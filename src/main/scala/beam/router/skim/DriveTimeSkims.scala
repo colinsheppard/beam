@@ -1,3 +1,5 @@
 package beam.router.skim
 
-case class DriveTimeSkims() extends AbstractSkimmerReadOnly {}
+import beam.sim.config.BeamConfig
+
+case class DriveTimeSkims(beamConfig: BeamConfig) extends AbstractSkimmerReadOnly {}

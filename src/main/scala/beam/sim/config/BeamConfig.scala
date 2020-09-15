@@ -621,7 +621,8 @@ object BeamConfig {
               distanceMultiplier: scala.Double,
               homeActivityPrefersResidentialParkingMultiplier: scala.Double,
               parkingPriceMultiplier: scala.Double,
-              rangeAnxietyMultiplier: scala.Double
+              rangeAnxietyMultiplier: scala.Double,
+              refuelWaitTime: scala.Double
             )
 
             object Params {
@@ -639,7 +640,8 @@ object BeamConfig {
                   parkingPriceMultiplier =
                     if (c.hasPathOrNull("parkingPriceMultiplier")) c.getDouble("parkingPriceMultiplier") else -0.005,
                   rangeAnxietyMultiplier =
-                    if (c.hasPathOrNull("rangeAnxietyMultiplier")) c.getDouble("rangeAnxietyMultiplier") else -0.5
+                    if (c.hasPathOrNull("rangeAnxietyMultiplier")) c.getDouble("rangeAnxietyMultiplier") else -0.5,
+                  refuelWaitTime = if (c.hasPathOrNull("refuelWaitTime")) c.getDouble("refuelWaitTime") else -0.01
                 )
               }
             }
@@ -1496,6 +1498,7 @@ object BeamConfig {
       }
 
       case class H3taz(
+        enabled: scala.Boolean,
         lowerBoundResolution: scala.Int,
         upperBoundResolution: scala.Int
       )
@@ -1504,6 +1507,7 @@ object BeamConfig {
 
         def apply(c: com.typesafe.config.Config): BeamConfig.Beam.Agentsim.H3taz = {
           BeamConfig.Beam.Agentsim.H3taz(
+            enabled = !c.hasPathOrNull("enabled") || c.getBoolean("enabled"),
             lowerBoundResolution = if (c.hasPathOrNull("lowerBoundResolution")) c.getInt("lowerBoundResolution") else 6,
             upperBoundResolution = if (c.hasPathOrNull("upperBoundResolution")) c.getInt("upperBoundResolution") else 9
           )
@@ -3139,7 +3143,8 @@ object BeamConfig {
       object Skim {
         case class DriveTimeSkimmer(
           fileBaseName: java.lang.String,
-          name: java.lang.String
+          name: java.lang.String,
+          timeBin: scala.Int
         )
 
         object DriveTimeSkimmer {
@@ -3149,7 +3154,8 @@ object BeamConfig {
               fileBaseName =
                 if (c.hasPathOrNull("fileBaseName")) c.getString("fileBaseName")
                 else "skimsTravelTimeObservedVsSimulated",
-              name = if (c.hasPathOrNull("name")) c.getString("name") else "drive-time-skimmer"
+              name = if (c.hasPathOrNull("name")) c.getString("name") else "drive-time-skimmer",
+              timeBin = if (c.hasPathOrNull("timeBin")) c.getInt("timeBin") else 3600
             )
           }
         }
@@ -3157,6 +3163,7 @@ object BeamConfig {
         case class OriginDestinationSkimmer(
           fileBaseName: java.lang.String,
           name: java.lang.String,
+          timeBin: scala.Int,
           writeAllModeSkimsForPeakNonPeakPeriodsInterval: scala.Int,
           writeFullSkimsInterval: scala.Int
         )
@@ -3167,6 +3174,7 @@ object BeamConfig {
             BeamConfig.Beam.Router.Skim.OriginDestinationSkimmer(
               fileBaseName = if (c.hasPathOrNull("fileBaseName")) c.getString("fileBaseName") else "skimsOD",
               name = if (c.hasPathOrNull("name")) c.getString("name") else "od-skimmer",
+              timeBin = if (c.hasPathOrNull("timeBin")) c.getInt("timeBin") else 3600,
               writeAllModeSkimsForPeakNonPeakPeriodsInterval =
                 if (c.hasPathOrNull("writeAllModeSkimsForPeakNonPeakPeriodsInterval"))
                   c.getInt("writeAllModeSkimsForPeakNonPeakPeriodsInterval")
@@ -3189,7 +3197,7 @@ object BeamConfig {
             BeamConfig.Beam.Router.Skim.TazSkimmer(
               fileBaseName = if (c.hasPathOrNull("fileBaseName")) c.getString("fileBaseName") else "skimsTAZ",
               name = if (c.hasPathOrNull("name")) c.getString("name") else "taz-skimmer",
-              timeBin = if (c.hasPathOrNull("timeBin")) c.getInt("timeBin") else 300
+              timeBin = if (c.hasPathOrNull("timeBin")) c.getInt("timeBin") else 900
             )
           }
         }

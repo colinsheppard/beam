@@ -184,7 +184,7 @@ The RideHailingInquiry message contains:
 * inquiryId
 * customerId
 * pickUpLocation
-* departAt time 
+* departAt time
 * destinationLocation
 
 The RideHailingInquiryResponse message contains:

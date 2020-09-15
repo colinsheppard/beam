@@ -290,13 +290,13 @@ Classname: ScoreStatsOutput
 +===============+===================================================================+
 | ITERATION     | Iteration number                                                  |
 +---------------+-------------------------------------------------------------------+
-| avg. EXECUTED | Average of the total execution time for the given iteration       |
+| avg. EXECUTED | Average of the total execution queueStartTime for the given iteration       |
 +---------------+-------------------------------------------------------------------+
-| avg. WORST    | Average of worst case time complexities for the given iteration   |
+| avg. WORST    | Average of worst case queueStartTime complexities for the given iteration   |
 +---------------+-------------------------------------------------------------------+
-| avg. AVG      | Average of average case time complexities for the given iteration |
+| avg. AVG      | Average of average case queueStartTime complexities for the given iteration |
 +---------------+-------------------------------------------------------------------+
-| avg. BEST     | Average of best case time complexities for the given iteration    |
+| avg. BEST     | Average of best case queueStartTime complexities for the given iteration    |
 +---------------+-------------------------------------------------------------------+
 
 File: /summaryStats.txt
@@ -349,7 +349,7 @@ Classname: SummaryStatsOutput
 +------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
 | totalIncentive_walk_transit              | Total incentive amount paid to passenger to reach destination by walking to transit and then transit to destination               |
 +------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
-| totalTravelTime                          | Total time taken by the passenger to travel from source to destination                                                            |
+| totalTravelTime                          | Total queueStartTime taken by the passenger to travel from source to destination                                                            |
 +------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
 | totalVehicleDelay                        | Sum of all the delay times incurred by the vehicle during the travel                                                              |
 +------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
@@ -413,7 +413,7 @@ Classname: EventOutput
 +--------------------------+-----------------------------------------------------+
 | vehicle                  | vehicle id                                          |
 +--------------------------+-----------------------------------------------------+
-| time                     | Start time of the vehicle                           |
+| queueStartTime                     | Start queueStartTime of the vehicle                           |
 +--------------------------+-----------------------------------------------------+
 | type                     | Type of the event                                   |
 +--------------------------+-----------------------------------------------------+
@@ -469,9 +469,9 @@ Classname: EventOutput
 +--------------------------+-----------------------------------------------------+
 | links                    | Number of links in the network                      |
 +--------------------------+-----------------------------------------------------+
-| departure_time           | Departure time of the vehicle                       |
+| departure_time           | Departure queueStartTime of the vehicle                       |
 +--------------------------+-----------------------------------------------------+
-| arrival_time             | Arrival time of the vehicle                         |
+| arrival_time             | Arrival queueStartTime of the vehicle                         |
 +--------------------------+-----------------------------------------------------+
 | vehicle_type             | Type of vehicle                                     |
 +--------------------------+-----------------------------------------------------+
@@ -500,9 +500,9 @@ Classname: LegHistogramOutput
 +--------------------------+-----------------------------------------------------------------------------+
 | field                    | description                                                                 |
 +==========================+=============================================================================+
-| time                     | Time                                                                        |
+| queueStartTime                     | Time                                                                        |
 +--------------------------+-----------------------------------------------------------------------------+
-| time                     | Time                                                                        |
+| queueStartTime                     | Time                                                                        |
 +--------------------------+-----------------------------------------------------------------------------+
 | departures_all           | Total number of departures on all modes                                     |
 +--------------------------+-----------------------------------------------------------------------------+
@@ -631,7 +631,7 @@ Classname: RideHailFleetInitialize
 +-------------------+-------------------------------------------------------------------------------+
 | initialLocationY  | Y-coordinate of the initial location of the ride hail vehicle                 |
 +-------------------+-------------------------------------------------------------------------------+
-| shifts            | Time shifts for the vehicle , usually a stringified collection of time ranges |
+| shifts            | Time shifts for the vehicle , usually a stringified collection of queueStartTime ranges |
 +-------------------+-------------------------------------------------------------------------------+
 | geoFenceX         | X-coordinate of the geo fence central point                                   |
 +-------------------+-------------------------------------------------------------------------------+

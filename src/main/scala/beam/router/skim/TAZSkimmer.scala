@@ -12,19 +12,19 @@ class TAZSkimmer @Inject()(matsimServices: MatsimServices, beamScenario: BeamSce
   import TAZSkimmer._
   private val config: BeamConfig.Beam.Router.Skim = beamConfig.beam.router.skim
 
-  override lazy val readOnlySkim: AbstractSkimmerReadOnly = TAZSkims(beamScenario)
+  override lazy val readOnlySkim: AbstractSkimmerReadOnly = TAZSkims(beamConfig, beamScenario)
 
   override protected val skimName: String = config.taz_skimmer.name
   override protected val skimFileBaseName: String = config.taz_skimmer.fileBaseName
   override protected val skimFileHeader: String =
-    "time,taz,hex,actor,key,value,observations,iterations"
+    "timeBin,taz,hex,actor,key,value,observations,iterations"
 
   override def fromCsv(
     line: scala.collection.Map[String, String]
   ): (AbstractSkimmerKey, AbstractSkimmerInternal) = {
     (
       TAZSkimmerKey(
-        line("time").toInt,
+        line("timeBin").toInt,
         Id.create(line("taz"), classOf[TAZ]),
         line("hex"),
         line("actor"),

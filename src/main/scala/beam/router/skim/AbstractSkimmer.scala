@@ -4,7 +4,7 @@ import java.io.BufferedWriter
 import java.nio.file.Paths
 
 import beam.agentsim.events.ScalaEvent
-import beam.sim.{BeamServices, BeamWarmStart}
+import beam.sim.BeamWarmStart
 import beam.sim.config.BeamConfig
 import beam.utils.{FileUtils, ProfilingUtils}
 import com.typesafe.scalalogging.LazyLogging
@@ -26,17 +26,13 @@ trait AbstractSkimmerKey {
 trait AbstractSkimmerInternal {
   val observations: Int
   val iterations: Int
-
   def toCsv: String
 }
 
 abstract class AbstractSkimmerEvent(eventTime: Double) extends Event(eventTime) with ScalaEvent {
-  protected val skimName: String
-
+  protected def skimName: String
   def getKey: AbstractSkimmerKey
-
   def getSkimmerInternal: AbstractSkimmerInternal
-
   def getEventType: String = skimName + "-event"
 }
 

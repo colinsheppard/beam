@@ -1,26 +1,19 @@
 package beam.agentsim.agents.ridehail
 
-import scala.util.{Failure, Random, Success, Try}
-
-import beam.agentsim.agents.choice.logit.MultinomialLogit
 import beam.agentsim.infrastructure.ParkingStall
-import beam.agentsim.infrastructure.charging.ChargingPointType
 import beam.agentsim.infrastructure.parking.ParkingZoneSearch.{
   ParkingAlternative,
   ParkingZoneSearchConfiguration,
   ParkingZoneSearchParams
 }
-import beam.agentsim.infrastructure.parking.{
-  ParkingMNL,
-  ParkingType,
-  ParkingZone,
-  ParkingZoneFileUtils,
-  ParkingZoneSearch
-}
+import beam.agentsim.infrastructure.parking._
 import beam.agentsim.infrastructure.taz.{TAZ, TAZTreeMap}
 import beam.router.BeamRouter.Location
+import beam.router.skim.Skims
 import com.typesafe.scalalogging.LazyLogging
 import com.vividsolutions.jts.geom.Envelope
+
+import scala.util.{Failure, Random, Success, Try}
 
 class RideHailDepotParkingManager(
   parkingFilePath: String,
@@ -31,6 +24,7 @@ class RideHailDepotParkingManager(
   boundingBox: Envelope,
   distFunction: (Location, Location) => Double,
   mnlParams: ParkingMNL.ParkingMNLConfig,
+  skims: Skims,
   parkingStallCountScalingFactor: Double = 1.0
 ) extends LazyLogging {
 
@@ -87,6 +81,7 @@ class RideHailDepotParkingManager(
     * @return the id of a ParkingZone, or, nothing if no parking zones are found with availability
     */
   def findDepot(
+    tick: Int,
     locationUtm: Location,
     parkingDuration: Double
   ): Option[ParkingStall] = {
@@ -131,11 +126,19 @@ class RideHailDepotParkingManager(
         val rangeAnxietyFactor: Double = 0.0 // RHAs are told to charge before this point
         val distanceFactor: Double = (distance / averagePersonWalkingSpeed / hourInSeconds) * valueOfTime
         val parkingCostsPriceFactor: Double = parkingAlternative.costInDollars
+        val tazSkimOption =
+          skims.taz_skimmer.getLatestSkimByTAZ(tick, parkingAlternative.taz.tazId, "RideHailManager", "RefuelWaitTime")
+        val refuelWaitTime: Double = tazSkimOption match {
+          case Some(tazSkim) => tazSkim.value
+          case _             => 0
+        }
+        val x = 1
 
         Map(
           ParkingMNL.Parameters.WalkingEgressCost -> distanceFactor,
           ParkingMNL.Parameters.ParkingTicketCost -> parkingCostsPriceFactor,
-          ParkingMNL.Parameters.RangeAnxietyCost  -> rangeAnxietyFactor
+          ParkingMNL.Parameters.RangeAnxietyCost  -> rangeAnxietyFactor,
+          ParkingMNL.Parameters.RefuelWaitTime    -> refuelWaitTime
         )
       }
 
@@ -230,6 +233,7 @@ object RideHailDepotParkingManager {
     boundingBox: Envelope,
     distFunction: (Location, Location) => Double,
     parkingMNLConfig: ParkingMNL.ParkingMNLConfig,
+    skims: Skims,
     parkingStallCountScalingFactor: Double
   ): RideHailDepotParkingManager = {
     new RideHailDepotParkingManager(
@@ -241,6 +245,7 @@ object RideHailDepotParkingManager {
       boundingBox,
       distFunction,
       parkingMNLConfig,
+      skims,
       parkingStallCountScalingFactor
     )
   }
