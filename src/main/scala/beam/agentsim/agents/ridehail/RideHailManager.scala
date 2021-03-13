@@ -1852,7 +1852,8 @@ class RideHailManager(
             modRHA2Cust,
             rideHailAgent2CustomerResponse.requestId,
             None,
-            isEmbodyWithCurrentTravelTime = false
+            isEmbodyWithCurrentTravelTime = false,
+            rideHailAgent2CustomerResponse.computedInMs
           )
 
         ridehailManagerCustomizationAPI.processVehicleLocationUpdateAtEndOfContinueRepositioningHook(

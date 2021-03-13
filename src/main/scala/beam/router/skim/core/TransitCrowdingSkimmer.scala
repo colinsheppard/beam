@@ -24,7 +24,8 @@ class TransitCrowdingSkimmer @Inject()(
   import TransitCrowdingSkimmer._
   override protected[skim] val readOnlySkim = new TransitCrowdingSkims(beamScenario.vehicleTypes)
   override protected val skimFileBaseName: String = beamConfig.beam.router.skim.transit_crowding_skimmer.fileBaseName
-  override protected val skimFileHeader = "vehicleId,fromStopIdx,numberOfPassengers,capacity,observations,iterations"
+  override protected val skimFileHeader =
+    "vehicleId,fromStopIdx,numberOfPassengers,capacity,observations,duration,iterations"
   override protected val skimName: String = beamConfig.beam.router.skim.transit_crowding_skimmer.name
 
   override protected def fromCsv(
@@ -38,7 +39,8 @@ class TransitCrowdingSkimmer @Inject()(
       TransitCrowdingSkimmerInternal(
         numberOfPassengers = line("numberOfPassengers").toInt,
         capacity = line("capacity").toInt,
-        iterations = line("iterations").toInt
+        iterations = line("iterations").toInt,
+        duration = line("duration").toInt
       )
     )
   }
@@ -65,6 +67,11 @@ class TransitCrowdingSkimmer @Inject()(
             prev.iterations + current.iterations,
             RoundingMode.HALF_UP
           ),
+          duration = IntMath.divide(
+            prev.duration * prev.iterations + current.duration * current.iterations,
+            prev.iterations + current.iterations,
+            RoundingMode.HALF_UP
+          ),
           iterations = prev.iterations + current.iterations
         )
     }
@@ -85,9 +92,11 @@ object TransitCrowdingSkimmer extends LazyLogging {
   case class TransitCrowdingSkimmerInternal(
     numberOfPassengers: Int,
     capacity: Int,
+    duration: Int,
     iterations: Int = 1,
   ) extends AbstractSkimmerInternal {
-    override def toCsv: String = numberOfPassengers + "," + capacity + "," + observations + "," + iterations
+    override def toCsv: String =
+      numberOfPassengers + "," + capacity + "," + observations + "," + duration + "," + iterations
 
     //vehicle id, fromStopIdx are unique within an iteration, so they can be observed only once
     override val observations = 1

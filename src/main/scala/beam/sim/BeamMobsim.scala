@@ -138,7 +138,10 @@ class BeamMobsim @Inject()(
 
     if (beamConfig.beam.agentsim.agents.tripBehaviors.mulitnomialLogit.generate_secondary_activities) {
       logger.info("Filling in secondary trips in plans")
-      fillInSecondaryActivities(matsimServices.getScenario.getHouseholds)
+      fillInSecondaryActivities(
+        beamServices.matsimServices.getScenario.getHouseholds,
+        matsimServices.getIterationNumber
+      )
     }
 
     val iteration = actorSystem.actorOf(
@@ -154,6 +157,7 @@ class BeamMobsim @Inject()(
       ),
       "BeamMobsim.iteration"
     )
+
     Await.result(iteration ? "Run!", timeout.duration)
 
     logger.info("Agentsim finished.")
@@ -164,7 +168,7 @@ class BeamMobsim @Inject()(
     logger.info("Processing Agentsim Events (End)")
   }
 
-  private def fillInSecondaryActivities(households: Households): Unit = {
+  private def fillInSecondaryActivities(households: Households, iteration: Int): Unit = {
     households.getHouseholds.values.forEach { household =>
       val vehicles = household.getVehicleIds.asScala
         .flatten(vehicleId => beamScenario.privateVehicles.get(vehicleId.asInstanceOf[Id[BeamVehicle]]))
@@ -221,7 +225,6 @@ class BeamMobsim @Inject()(
       }
 
     }
-
     logger.info("Done filling in secondary trips in plans")
   }
 

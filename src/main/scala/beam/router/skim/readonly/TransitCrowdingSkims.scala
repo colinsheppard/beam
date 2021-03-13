@@ -3,7 +3,7 @@ package beam.router.skim.readonly
 import java.math.RoundingMode
 
 import beam.agentsim.agents.vehicles.BeamVehicleType
-import beam.router.model.EmbodiedBeamTrip
+import beam.router.model.{BeamLeg, EmbodiedBeamLeg, EmbodiedBeamTrip}
 import beam.router.skim.core.TransitCrowdingSkimmer.{TransitCrowdingSkimmerInternal, TransitCrowdingSkimmerKey}
 import beam.router.skim.core.{AbstractSkimmerInternal, AbstractSkimmerKey, AbstractSkimmerReadOnly}
 import com.google.common.math.IntMath
@@ -16,6 +16,34 @@ import org.matsim.vehicles.Vehicle
   * @author Dmitry Openkov
   */
 class TransitCrowdingSkims(vehicleTypes: Map[Id[BeamVehicleType], BeamVehicleType]) extends AbstractSkimmerReadOnly {
+
+  def getTransitCrowdingTimeMultiplier(
+    leg: EmbodiedBeamLeg,
+    maxMultiplier: Double,
+    crowdingThreshold: Double
+  ): Double = {
+    if (leg.beamLeg.mode.isTransit) {
+      val occupancyLevels: IndexedSeq[(Double, Double)] = for {
+        transitStops <- leg.beamLeg.travelPath.transitStops.toIndexedSeq
+        internal <- getListOfTransitCrowdingInternals(
+          leg.beamVehicleId,
+          leg.beamVehicleTypeId,
+          transitStops.fromIdx,
+          transitStops.toIdx
+        )
+      } yield (internal.numberOfPassengers.toDouble / internal.capacity, internal.duration.toDouble)
+      val durationAndScaledTime = occupancyLevels.foldLeft((0.0, 0.0)) {
+        case ((runningDuration, runningScaledTime), (crowding, duration)) =>
+          val scaledTime = (((crowding - crowdingThreshold) / (1.0 - crowdingThreshold))
+            .min(1.0)
+            .max(0.0) * maxMultiplier + 1.0) * duration
+          (runningDuration + duration, runningScaledTime + scaledTime)
+      }
+      durationAndScaledTime._2 / durationAndScaledTime._1
+    } else {
+      1.0
+    }
+  }
 
   def getTransitOccupancyLevelForPercentile(trip: EmbodiedBeamTrip, percentile: Double): Double = {
     val occupancyLevels: IndexedSeq[Double] = for {
@@ -77,6 +105,7 @@ class TransitCrowdingSkims(vehicleTypes: Map[Id[BeamVehicleType], BeamVehicleTyp
       TransitCrowdingSkimmerInternal(
         numberOfPassengers = IntMath.divide(x.numberOfPassengers + y.numberOfPassengers, 2, RoundingMode.HALF_UP),
         capacity = x.capacity,
+        duration = IntMath.divide(x.duration + y.duration, 2, RoundingMode.HALF_UP),
         iterations = 2
       )
     }
