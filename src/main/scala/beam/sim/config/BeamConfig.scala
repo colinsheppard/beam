@@ -3482,7 +3482,7 @@ object BeamConfig {
         case class OriginDestinationSkimmer(
           fileBaseName: java.lang.String,
           name: java.lang.String,
-          poolingTravelTimeOveheadFactor: scala.Double,
+          poolingTravelTimeOverheadFactor: scala.Double,
           writeAllModeSkimsForPeakNonPeakPeriodsInterval: scala.Int,
           writeFullSkimsInterval: scala.Int
         )
@@ -3493,8 +3493,8 @@ object BeamConfig {
             BeamConfig.Beam.Router.Skim.OriginDestinationSkimmer(
               fileBaseName = if (c.hasPathOrNull("fileBaseName")) c.getString("fileBaseName") else "skimsOD",
               name = if (c.hasPathOrNull("name")) c.getString("name") else "od-skimmer",
-              poolingTravelTimeOveheadFactor =
-                if (c.hasPathOrNull("poolingTravelTimeOveheadFactor")) c.getDouble("poolingTravelTimeOveheadFactor")
+              poolingTravelTimeOverheadFactor =
+                if (c.hasPathOrNull("poolingTravelTimeOverheadFactor")) c.getDouble("poolingTravelTimeOverheadFactor")
                 else 1.21,
               writeAllModeSkimsForPeakNonPeakPeriodsInterval =
                 if (c.hasPathOrNull("writeAllModeSkimsForPeakNonPeakPeriodsInterval"))
@@ -3508,6 +3508,7 @@ object BeamConfig {
 
         case class TazSkimmer(
           fileBaseName: java.lang.String,
+          geoHierarchy: java.lang.String,
           name: java.lang.String
         )
 
@@ -3516,6 +3517,7 @@ object BeamConfig {
           def apply(c: com.typesafe.config.Config): BeamConfig.Beam.Router.Skim.TazSkimmer = {
             BeamConfig.Beam.Router.Skim.TazSkimmer(
               fileBaseName = if (c.hasPathOrNull("fileBaseName")) c.getString("fileBaseName") else "skimsTAZ",
+              geoHierarchy = if (c.hasPathOrNull("geoHierarchy")) c.getString("geoHierarchy") else "TAZ",
               name = if (c.hasPathOrNull("name")) c.getString("name") else "taz-skimmer"
             )
           }

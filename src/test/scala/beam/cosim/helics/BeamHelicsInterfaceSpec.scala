@@ -20,7 +20,7 @@ class BeamHelicsInterfaceSpec extends AnyFlatSpec with Matchers with BeamHelper 
     helics.helicsCloseLibrary()
   }
 
-  "Running a broker and two federates" must "result is message being transmitted back and forth" in {
+  "Running a broker and two federates" must "result is message being transmitted back and forth" ignore {
     lazy val beamBroker =
       getBroker(
         "Broker",
@@ -65,7 +65,7 @@ class BeamHelicsInterfaceSpec extends AnyFlatSpec with Matchers with BeamHelper 
     val time1 = beamFederate.sync(1)
     time1 should be(1.0)
 
-    val (time2, response) = (beamFederate.sync(2), beamFederate.collectJSON())
+    val (time2, response) = (beamFederate.sync(2), beamFederate.syncThenCollectJSON(11))
     time2 should be(2.0)
     response.size should be(1)
     response.head should contain("key"   -> "foo")
@@ -78,7 +78,7 @@ class BeamHelicsInterfaceSpec extends AnyFlatSpec with Matchers with BeamHelper 
     beamBroker.getBrokersFederate.isDefined should be(true)
     val beamFederate = beamBroker.getBrokersFederate.get
 
-    val (time1, message) = (beamFederate.sync(1), beamFederate.collectAny())
+    val (time1, message) = (beamFederate.sync(1), beamFederate.syncThenCollectAny(11))
     time1 should be(1.0)
     message.mkString(",").trim should be("foo,123456")
 
