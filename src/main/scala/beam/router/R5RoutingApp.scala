@@ -71,7 +71,7 @@ object R5RoutingApp extends BeamHelper {
 
     val workerRouter: ActorRef = actorSystem.actorOf(Props(classOf[RoutingWorker], cfg), name = "workerRouter")
     val f = Await.result(workerRouter ? Identify(0), Duration.Inf)
-    logger.info("R5RoutingWorker is initialized!")
+    logger.info("RoutingWorker is initialized!")
 
     val isWarmMode = BeamWarmStart.isLinkStatsEnabled(beamCfg.beam.warmStart)
     logger.info(s"warmStart isEnabled?: $isWarmMode")
