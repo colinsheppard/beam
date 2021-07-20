@@ -60,7 +60,7 @@ import org.matsim.core.events.ParallelEventsManagerImpl
 import org.matsim.core.scenario.{MutableScenario, ScenarioBuilder, ScenarioByInstanceModule, ScenarioUtils}
 import org.matsim.core.trafficmonitoring.TravelTimeCalculator
 import org.matsim.core.utils.collections.QuadTree
-import org.matsim.households.{Household, Households, Income, IncomeImpl}
+import org.matsim.households.{Household, Households}
 import org.matsim.utils.objectattributes.AttributeConverter
 import org.matsim.vehicles.Vehicle
 
@@ -75,7 +75,7 @@ import scala.concurrent.Await
 import scala.sys.process.Process
 import scala.util.{Random, Try}
 
-trait BeamHelper extends LazyLogging {
+trait BeamHelper extends LazyLogging with Tracing {
   //  Kamon.init()
 
   protected val beamAsciiArt: String =
@@ -215,11 +215,13 @@ trait BeamHelper extends LazyLogging {
             .toProvider(classOf[UtilityBasedModeChoice])
           addAttributeConverterBinding(classOf[MapStringDouble])
             .toInstance(new AttributeConverter[MapStringDouble] {
-              override def convertToString(o: scala.Any): String =
+              override def convertToString(o: scala.Any): String = {
                 mapper.writeValueAsString(o.asInstanceOf[MapStringDouble].data)
+              }
 
-              override def convert(value: String): MapStringDouble =
+              override def convert(value: String): MapStringDouble = {
                 MapStringDouble(mapper.readValue(value, classOf[Map[String, Double]]))
+              }
             })
           bind(classOf[BeamScenario]).toInstance(beamScenario)
           bind(classOf[TransportNetwork]).toInstance(beamScenario.transportNetwork)
@@ -350,7 +352,7 @@ trait BeamHelper extends LazyLogging {
   def privateVehicles(
     beamConfig: BeamConfig,
     vehicleTypes: Map[Id[BeamVehicleType], BeamVehicleType]
-  ): TrieMap[Id[BeamVehicle], BeamVehicle] =
+  ): TrieMap[Id[BeamVehicle], BeamVehicle] = {
     if (beamConfig.beam.agentsim.agents.population.useVehicleSampling) {
       TrieMap[Id[BeamVehicle], BeamVehicle]()
     } else {
@@ -362,6 +364,7 @@ trait BeamHelper extends LazyLogging {
         ).toSeq: _*
       )
     }
+  }
 
   // Note that this assumes standing room is only available on transit vehicles. Not sure of any counterexamples modulo
   // say, a yacht or personal bus, but I think this will be fine for now.
@@ -388,6 +391,7 @@ trait BeamHelper extends LazyLogging {
     isConfigArgRequired: Boolean = true
   ): Unit = {
     val (parsedArgs, config) = prepareConfig(args, isConfigArgRequired)
+    startKamonTracingIfEnabled(config)
 
     parsedArgs.clusterType match {
       case Some(Worker) => runClusterWorkerUsing(config) //Only the worker requires a different path
@@ -473,18 +477,18 @@ trait BeamHelper extends LazyLogging {
   def runClusterWorkerUsing(config: TypesafeConfig): Unit = {
     val clusterConfig = ConfigFactory
       .parseString("""
-           |akka.cluster.roles = [compute]
-           |akka.actor.deployment {
-           |      /statsService/singleton/workerRouter {
-           |        router = round-robin-pool
-           |        cluster {
-           |          enabled = on
-           |          max-nr-of-instances-per-node = 1
-           |          allow-local-routees = on
-           |          use-roles = ["compute"]
-           |        }
-           |      }
-           |    }
+          |akka.cluster.roles = [compute]
+          |akka.actor.deployment {
+          |      /statsService/singleton/workerRouter {
+          |        router = round-robin-pool
+          |        cluster {
+          |          enabled = on
+          |          max-nr-of-instances-per-node = 1
+          |          allow-local-routees = on
+          |          use-roles = ["compute"]
+          |        }
+          |      }
+          |    }
           """.stripMargin)
       .withFallback(config)
 
@@ -681,7 +685,11 @@ trait BeamHelper extends LazyLogging {
     } mkString " , "
     logger.info(s"Vehicles assigned to households : $vehicleInfo")
 
-    run(beamServices)
+    val executionId = BeamExecutionConfig.executionIdFromDirectory(outputDir)
+    tracing("beamStarted", ("executionId", executionId)) { _ =>
+      run(beamServices)
+    }
+
   }
 
   private def applyFractionOfPlansWithSingleActivity(
@@ -900,9 +908,6 @@ trait BeamHelper extends LazyLogging {
 
     level = beamConfig.beam.metrics.level
     runName = beamConfig.beam.agentsim.simulationName
-    if (isMetricsEnable) {
-      Kamon.init(config.withFallback(ConfigFactory.load()))
-    }
 
     logger.info("Starting beam on branch {} at commit {}.", BashUtils.getBranch, BashUtils.getCommitHash)
 
@@ -923,7 +928,7 @@ trait BeamHelper extends LazyLogging {
     * This method merges all configuration parameters into a single file including parameters from
     * 'include' statements. Two full config files are written out: One without comments and one with
     * comments in JSON format.
-    * @param config the input config file
+    * @param config          the input config file
     * @param outputDirectory output folder where full configs will be generated
     */
   private def writeFullConfigs(config: TypesafeConfig, outputDirectory: String) = {
