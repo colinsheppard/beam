@@ -3,10 +3,17 @@ package beam.utils.scenario.urbansim.censusblock.merger
 import beam.utils.scenario.urbansim.censusblock.entities.{Activity, InputPlanElement, Leg}
 import beam.utils.scenario.{PersonId, PlanElement}
 
-import scala.math._
+object PlanMerger {
+
+  def tripKey(person: String, time: Double): (String, Double) = {
+    (person, math.floor(time))
+  }
+}
 
 class PlanMerger(val trips: Map[(String, Double), String], modeMap: Map[String, String])
     extends Merger[InputPlanElement, PlanElement] {
+
+  import PlanMerger._
 
   private var activityPersonOpt: Option[String] = None
   private var timeOpt: Option[Double] = None
@@ -22,8 +29,8 @@ class PlanMerger(val trips: Map[(String, Double), String], modeMap: Map[String, 
       case Leg =>
         val modeOpt = for {
           activityPerson <- activityPersonOpt
-          time           <- timeOpt.map(floor)
-          inputRes       <- trips.get((activityPerson, time))
+          time           <- timeOpt
+          inputRes       <- trips.get(tripKey(activityPerson, time))
           outputRes = convertMode(inputRes)
         } yield outputRes
 
@@ -39,7 +46,7 @@ class PlanMerger(val trips: Map[(String, Double), String], modeMap: Map[String, 
       0,
       0,
       planSelected = true,
-      inputPlanElement.activityElement.toString,
+      PlanElement.PlanElementType(inputPlanElement.activityElement.toString),
       inputPlanElement.planElementIndex,
       inputPlanElement.ActivityType,
       inputPlanElement.x,
