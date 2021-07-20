@@ -17,7 +17,13 @@ import beam.agentsim.agents.ridehail.RideHailAgent.{
   ModifyPassengerScheduleAcks
 }
 import beam.agentsim.agents.ridehail.RideHailManager.RoutingResponses
-import beam.agentsim.agents.vehicles.{BeamVehicle, BeamVehicleType, PassengerSchedule, PersonIdWithActorRef}
+import beam.agentsim.agents.vehicles.{
+  BeamVehicle,
+  BeamVehicleType,
+  PassengerSchedule,
+  PersonIdWithActorRef,
+  VehicleManager
+}
 import beam.agentsim.events.SpaceTime
 import beam.agentsim.infrastructure.{ParkingInquiry, ParkingInquiryResponse}
 import beam.agentsim.scheduler.BeamAgentScheduler.{CompletionNotice, ScheduleTrigger}
@@ -484,9 +490,10 @@ object HouseholdActor {
           veh.setManager(Some(self))
           veh.spaceTime = SpaceTime(homeCoord.getX, homeCoord.getY, 0)
           for {
-            ParkingInquiryResponse(stall, _, _) <- parkingManager ? ParkingInquiry(
+            ParkingInquiryResponse(stall, _, _) <- parkingManager ? ParkingInquiry.init(
               veh.spaceTime,
               "init",
+              VehicleManager.defaultManager,
               triggerId = triggerId
             )
           } {

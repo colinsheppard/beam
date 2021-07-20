@@ -36,8 +36,7 @@ case class ODSkims(beamConfig: BeamConfig, beamScenario: BeamScenario) extends A
     departureTime: Int,
     vehicleTypeId: Id[BeamVehicleType],
     beamVehicleType: BeamVehicleType,
-    fuelPrice: Double,
-    beamScenario: BeamScenario
+    fuelPrice: Double
   ): Skim = {
     val (travelDistance, travelTime) = distanceAndTime(mode, originUTM, destinationUTM)
     val votMultiplier: Double = mode match {
@@ -137,7 +136,6 @@ case class ODSkims(beamConfig: BeamConfig, beamScenario: BeamScenario) extends A
     vehicleTypeId: Id[BeamVehicleType],
     vehicleType: BeamVehicleType,
     fuelPrice: Double,
-    beamScenario: BeamScenario,
     maybeOrigTazForPerformanceImprovement: Option[Id[TAZ]] =
       None, //If multiple times the same origin/destination is used, it
     maybeDestTazForPerformanceImprovement: Option[Id[TAZ]] =
@@ -165,8 +163,7 @@ case class ODSkims(beamConfig: BeamConfig, beamScenario: BeamScenario) extends A
           departureTime,
           vehicleTypeId,
           vehicleType,
-          fuelPrice,
-          beamScenario
+          fuelPrice
         )
     }
   }
@@ -203,8 +200,7 @@ case class ODSkims(beamConfig: BeamConfig, beamScenario: BeamScenario) extends A
             timeBin * 3600,
             dummyId,
             vehicleType,
-            fuelPrice,
-            beamScenario
+            fuelPrice
           )
         }
     }

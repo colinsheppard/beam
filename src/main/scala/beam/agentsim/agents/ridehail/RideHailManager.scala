@@ -9,12 +9,10 @@ import beam.agentsim.agents.BeamAgent.Finish
 import beam.agentsim.agents.choice.mode.DrivingCost
 import beam.agentsim.agents.household.CAVSchedule.RouteOrEmbodyRequest
 import beam.agentsim.agents.modalbehaviors.DrivesVehicle._
-import beam.agentsim.agents.ridehail.ParkingZoneDepotData.ChargingQueueEntry
 import beam.agentsim.agents.ridehail.RideHailAgent._
 import beam.agentsim.agents.ridehail.RideHailManager._
 import beam.agentsim.agents.ridehail.RideHailManagerHelper.{Available, Refueling, RideHailAgentLocation}
 import beam.agentsim.agents.ridehail.allocation.{DispatchProductType, _}
-import beam.agentsim.agents.ridehail.charging.VehicleChargingManager
 import beam.agentsim.agents.ridehail.kpis.RealTimeKpis
 import beam.agentsim.agents.vehicles.AccessErrorCodes.{
   CouldNotFindRouteToCustomer,
@@ -24,13 +22,13 @@ import beam.agentsim.agents.vehicles.AccessErrorCodes.{
 import beam.agentsim.agents.vehicles.BeamVehicle.BeamVehicleState
 import beam.agentsim.agents.vehicles.FuelType.Electricity
 import beam.agentsim.agents.vehicles.VehicleProtocol.StreetVehicle
-import beam.agentsim.agents.vehicles.{PassengerSchedule, _}
+import beam.agentsim.agents.vehicles.{PassengerSchedule, VehicleManager, _}
 import beam.agentsim.agents.{Dropoff, InitializeTrigger, MobilityRequest, Pickup}
 import beam.agentsim.events.{RideHailFleetStateEvent, SpaceTime}
-import beam.agentsim.infrastructure.{ParkingInquiry, ParkingInquiryResponse, ParkingStall}
+import beam.agentsim.infrastructure.{ParkingInquiryResponse, ParkingStall}
 import beam.agentsim.scheduler.BeamAgentScheduler.{CompletionNotice, ScheduleTrigger}
-import beam.agentsim.scheduler.{HasTriggerId, Trigger}
 import beam.agentsim.scheduler.Trigger.TriggerWithId
+import beam.agentsim.scheduler.{HasTriggerId, Trigger}
 import beam.router.BeamRouter.{Location, RoutingRequest, RoutingResponse, _}
 import beam.router.Modes.BeamMode._
 import beam.router.model.{BeamLeg, EmbodiedBeamLeg, EmbodiedBeamTrip}
@@ -40,12 +38,11 @@ import beam.router.skim.event.TAZSkimmerEvent
 import beam.router.{BeamRouter, RouteHistory}
 import beam.sim.RideHailFleetInitializer.RideHailAgentInitializer
 import beam.sim._
-import beam.sim.metrics.SimulationMetricCollector._
-import beam.agentsim.agents.vehicles.VehicleManager
 import beam.sim.config.BeamConfig.Beam.Debug
+import beam.sim.metrics.SimulationMetricCollector._
 import beam.utils._
-import beam.utils.logging.{LogActorState, LoggingMessageActor}
 import beam.utils.logging.pattern.ask
+import beam.utils.logging.{LogActorState, LoggingMessageActor}
 import beam.utils.matsim_conversion.ShapeUtils.QuadTreeBounds
 import beam.utils.reflection.ReflectionUtils
 import com.conveyal.r5.transit.TransportNetwork
@@ -63,7 +60,6 @@ import java.util
 import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -386,13 +382,6 @@ class RideHailManager(
 
   val realTimeKpis = new RealTimeKpis(beamServices, 300)
 
-  private val vehicleChargingManager = VehicleChargingManager(
-    beamServices,
-    resources,
-    rideHailParkingNetwork,
-    realTimeKpis
-  )
-
   var requestedRideHail: Int = 0
   var servedRideHail: Int = 0
 
@@ -493,9 +482,6 @@ class RideHailManager(
       }
 
       ridehailManagerCustomizationAPI.receiveFinishMessageHook()
-
-      val iterationNumber = beamServices.matsimServices.getIterationNumber
-      vehicleChargingManager.finishIteration(iterationNumber)
 
       surgePricingManager.incrementIteration()
       context.children.foreach(_ ! Finish)
@@ -798,14 +784,6 @@ class RideHailManager(
         continueProcessingTimeoutIfReady(triggerId)
       }
 
-    //    case ParkingInquiryResponse(None, requestId) =>
-    //      val vehId = parkingInquiryCache(requestId).vehicleId
-    //      log.warning(
-    //        "No parking stall found, ride hail vehicle {} stranded",
-    //        vehId
-    //      )
-    //      outOfServiceVehicleManager.releaseTrigger(vehId, Vector())
-
     case ParkingInquiryResponse(stall, requestId, triggerId) =>
       val agentLocation = parkingInquiryCache.remove(requestId).get
 
@@ -922,55 +900,18 @@ class RideHailManager(
     rideHailManagerHelper.vehicleState.put(vehicleId, beamVehicleState)
     rideHailManagerHelper.updatePassengerSchedule(vehicleId, None, None)
 
-    val triggerToSendAndQueueZoneOpt = addOrRemoveVehicleFromCharging(vehicleId, whenWhere.time)
-
     val beamVehicle = resources(vehicleId)
-    beamVehicle.getDriver.get ! NotifyVehicleResourceIdleReply(
-      triggerId,
-      triggerToSendAndQueueZoneOpt._1,
-      triggerToSendAndQueueZoneOpt._2
-    )
-  }
 
-  def addOrRemoveVehicleFromCharging(vehicleId: VehicleId, tick: Int): (Vector[ScheduleTrigger], Option[Int]) = {
-    rideHailParkingNetwork.notifyVehicleNoLongerOnWayToRefuelingDepot(vehicleId) match {
-      case Some(parkingStall) =>
-        val beamVehicle = resources(vehicleId)
-        rideHailParkingNetwork.attemptToRefuel(
-          beamVehicle,
-          parkingStall,
-          tick,
-          vehicleChargingManager.getQueuePriorityFor(beamVehicle),
-          JustArrivedAtDepot
-        )
+    val vehicleArrivedAtTickAndStall =
+      rideHailParkingNetwork.notifyVehicleNoLongerOnWayToRefuelingDepot(vehicleId).map((whenWhere.time, _))
+
+    if (vehicleArrivedAtTickAndStall.isEmpty) {
       //If not arrived for refueling;
-      case _ => {
-        log.debug("Making vehicle {} available", vehicleId)
-        rideHailManagerHelper.makeAvailable(vehicleId)
-        rideHailParkingNetwork.removeFromCharging(vehicleId, tick) match {
-          case Some(parkingStall) => {
-            rideHailParkingNetwork.dequeueNextVehicleForRefuelingFrom(
-              parkingStall.parkingZoneId,
-              tick
-            ) match {
-              case Some(ChargingQueueEntry(nextVehicle, nextVehiclesParkingStall, _)) =>
-                val result = rideHailParkingNetwork.attemptToRefuel(
-                  nextVehicle,
-                  nextVehiclesParkingStall,
-                  tick,
-                  vehicleChargingManager.getQueuePriorityFor(nextVehicle),
-                  DequeuedToCharge
-                )
-                result
-              case None =>
-                (Vector(), None)
-            }
-          }
-          case None =>
-            (Vector(), None)
-        }
-      }
+      log.debug("Making vehicle {} available", vehicleId)
+      rideHailManagerHelper.makeAvailable(vehicleId)
     }
+
+    beamVehicle.getDriver.get ! NotifyVehicleResourceIdleReply(triggerId, Seq.empty, vehicleArrivedAtTickAndStall)
   }
 
   def dieIfNoChildren(): Unit = {
@@ -1031,17 +972,6 @@ class RideHailManager(
     }
     val fare = distanceFare + timeFareAdjusted + additionalCost + baseCost
     Map(request.customer.personId -> fare)
-  }
-
-  def findRefuelStationAndSendVehicle(
-    rideHailAgentLocation: RideHailAgentLocation,
-    beamVehicle: BeamVehicle,
-    triggerId: Long
-  ): Unit = {
-    val destinationUtm: SpaceTime = rideHailAgentLocation.latestUpdatedLocationUTM
-    val inquiry = ParkingInquiry(destinationUtm, "fast-charge", Some(beamVehicle), None, triggerId = triggerId)
-    parkingInquiryCache.put(inquiry.requestId, rideHailAgentLocation)
-    parkingManager ! inquiry
   }
 
   /* END: Refueling Logic */
@@ -1660,16 +1590,25 @@ class RideHailManager(
   }
 
   def handleNotifyVehicleDoneRefuelingAndOutOfService(notify: NotifyVehicleDoneRefuelingAndOutOfService): Unit = {
-    val loc = rideHailManagerHelper.getRideHailAgentLocation(notify.vehicleId)
     rideHailManagerHelper.updateLocationOfAgent(notify.vehicleId, notify.whenWhere)
     rideHailManagerHelper.vehicleState.put(notify.vehicleId, notify.beamVehicleState)
     rideHailManagerHelper.updatePassengerSchedule(notify.vehicleId, None, None)
-    val (triggerToSend, maybeQueuedParkingZoneId) = addOrRemoveVehicleFromCharging(notify.vehicleId, notify.tick)
-    val beamVehicle = resources(notify.vehicleId)
-    beamVehicle.getDriver.get ! NotifyVehicleDoneRefuelingAndOutOfServiceReply(
+
+    val vehicleArrivedAtTickAndStall =
+      rideHailParkingNetwork
+        .notifyVehicleNoLongerOnWayToRefuelingDepot(notify.vehicleId)
+        .map((notify.whenWhere.time, _))
+
+    if (vehicleArrivedAtTickAndStall.isEmpty) {
+      //If not arrived for refueling;
+      log.debug("Making vehicle {} available", notify.vehicleId)
+      rideHailManagerHelper.makeAvailable(notify.vehicleId)
+    }
+
+    resources(notify.vehicleId).getDriver.get ! NotifyVehicleDoneRefuelingAndOutOfServiceReply(
       notify.triggerId,
-      triggerToSend,
-      maybeQueuedParkingZoneId
+      Seq.empty,
+      vehicleArrivedAtTickAndStall
     )
     rideHailManagerHelper.putOutOfService(notify.vehicleId)
   }
@@ -1716,7 +1655,7 @@ class RideHailManager(
         .filter(veh => rideHailParkingNetwork.isOnWayToRefuelingDepotOrIsRefuelingOrInQueue(veh._1))
         .map(tup => (tup, rideHailManagerHelper.getServiceStatusOf(tup._1)))
 
-    if (badVehicles.size > 0) {
+    if (badVehicles.nonEmpty) {
       log.debug(
         f"Some vehicles (${badVehicles.size}) still appear as 'idle' despite being on way to refuel or refueling, head: ${badVehicles.head}"
       )
@@ -1729,10 +1668,10 @@ class RideHailManager(
       additionalCustomVehiclesForDepotCharging.contains(vehicleId)
     }
 
-    val vehicleChargingManagerResult = vehicleChargingManager
-      .findStationsForVehiclesInNeedOfCharging(tick, vehiclesWithoutCustomVehicles)
+    val vehicleChargingManagerResult = rideHailParkingNetwork
+      .findStationsForVehiclesInNeedOfCharging(tick, resources, vehiclesWithoutCustomVehicles, beamServices)
     val candidateVehiclesHeadedToRefuelingDepot =
-      vehicleChargingManagerResult.sendToCharge ++ additionalCustomVehiclesForDepotCharging
+      vehicleChargingManagerResult ++ additionalCustomVehiclesForDepotCharging
 
     val vehiclesHeadedToRefuelingDepot: Vector[(VehicleId, ParkingStall)] =
       candidateVehiclesHeadedToRefuelingDepot
@@ -1958,16 +1897,6 @@ class RideHailManager(
           )
       }
     rideInitialLocation
-  }
-
-  private def convertToShiftString(startTimes: ArrayBuffer[Int], endTimes: ArrayBuffer[Int]): Option[String] = {
-    if (startTimes.length != endTimes.length) {
-      None
-    } else {
-      val outArray = scala.collection.mutable.ArrayBuffer.empty[String]
-      Array((startTimes zip endTimes).foreach(x => outArray += Array("{", x._1, ":", x._2, "}").mkString))
-      Option(outArray.mkString(";"))
-    }
   }
 
   /**
